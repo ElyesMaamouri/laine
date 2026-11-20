@@ -240,6 +240,50 @@ export async function moveCategory(slug: string, dir: -1 | 1): Promise<Result> {
   return { ok: true };
 }
 
+/* ---------------- données de démo ---------------- */
+
+/**
+ * Ajoute produits, catégories et commandes de démo SANS rien écraser :
+ * les produits et catégories déjà présents (même identifiant) sont ignorés.
+ */
+export async function loadDemoData(orderCount = 20): Promise<Result & { added?: { products: number; categories: number; orders: number } }> {
+  await guard();
+  const { demoProducts, demoCategories, demoOrderDrafts } = await import("@/lib/demo-data");
+  const { priceLines } = await import("@/lib/pricing");
+  const n = Math.max(0, Math.min(50, Math.floor(orderCount)));
+
+  const added = await write((d) => {
+    const cats = demoCategories.filter((c) => !d.catalog.categories.some((x) => x.slug === c.slug));
+    d.catalog.categories.push(...structuredClone(cats));
+    const prods = demoProducts.filter((p) => !d.catalog.products.some((x) => x.id === p.id));
+    d.catalog.products.push(...structuredClone(prods));
+
+    // commandes sur tout le catalogue (produits existants + démo), prix recalculés
+    const drafts = demoOrderDrafts(d.catalog.products, n);
+    let num = d.orders.length + 1001;
+    let orders = 0;
+    for (const o of drafts) {
+      const priced = priceLines(o.lines, d.catalog.products);
+      if (!priced.items.length) continue;
+      d.orders.push({
+        id: crypto.randomUUID(),
+        number: `MA-${num++}`,
+        userId: null,
+        customer: o.customer,
+        ...priced,
+        payment: "cod",
+        status: o.status,
+        source: o.source,
+        createdAt: o.createdAt,
+      });
+      orders++;
+    }
+    return { products: prods.length, categories: cats.length, orders };
+  });
+  updateTag(CATALOG_TAG);
+  return { ok: true, added };
+}
+
 /* ---------------- commandes ---------------- */
 
 export async function setOrderStatus(id: string, status: OrderStatus): Promise<Result> {

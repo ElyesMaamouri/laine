@@ -4,6 +4,47 @@ import Link from "next/link";
 import AdminShell, { useAdmin } from "@/components/admin/AdminShell";
 import StatusBadge from "@/components/admin/StatusBadge";
 import { formatPrice } from "@/lib/products";
+import { useState } from "react";
+import { loadDemoData } from "./actions";
+
+/** Bouton qui ajoute produits, catégories et commandes de démo (sans rien écraser) */
+function DemoLoader() {
+  const { reload } = useAdmin();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const run = async () => {
+    if (!confirm("Ajouter les produits, catégories et ~20 commandes de démo ? Rien d'existant ne sera modifié.")) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const r = await loadDemoData(20);
+      if (!r.ok) setMsg(r.error);
+      else {
+        const a = r.added!;
+        setMsg(`Ajouté : ${a.products} produit(s), ${a.categories} catégorie(s), ${a.orders} commande(s).`);
+        await reload();
+      }
+    } catch {
+      setMsg("Échec, rechargez la page et réessayez.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-6 border-t border-line pt-4">
+      <p className="text-sm font-medium">Données de démonstration</p>
+      <p className="mt-1 text-xs text-muted">Ajoute 8 produits, 5 catégories et ~20 commandes fictives, sans toucher à l&apos;existant.</p>
+      <button
+        onClick={run}
+        disabled={busy}
+        className="mt-3 w-full rounded-lg border border-dashed border-ink/40 px-4 py-3 text-sm hover:border-ink disabled:opacity-50"
+      >
+        {busy ? "Chargement…" : "Charger les données de démo"}
+      </button>
+      {msg && <p className="mt-2 text-xs text-muted">{msg}</p>}
+    </div>
+  );
+}
 
 export default function AdminHome() {
   return (
@@ -67,6 +108,7 @@ function Dashboard() {
             <Link href="/admin/categories" className="rounded-lg border border-line px-4 py-3 hover:border-ink">Gérer les catégories</Link>
             <Link href="/admin/commandes" className="rounded-lg border border-line px-4 py-3 hover:border-ink">Traiter les commandes</Link>
           </div>
+          <DemoLoader />
         </section>
       </div>
     </div>
