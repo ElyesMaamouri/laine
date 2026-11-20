@@ -21,6 +21,8 @@ export default function CheckoutView() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // commande enregistrée : on garde un écran d'attente pendant la redirection (le panier est vidé juste après)
+  const [placed, setPlaced] = useState(false);
   const { products } = useCatalog();
   const priced = priceLines(items, products);
   const totals = withDiscount(priced.subtotal, promo?.discount ?? 0);
@@ -50,14 +52,25 @@ export default function CheckoutView() {
         setError(d.errors?.promo ?? d.errors?.items ?? "Vérifiez les champs en rouge.");
         return;
       }
-      clear();
+      setPlaced(true);
       router.push(`/commande/confirmation?id=${d.id}`);
+      clear();
     } catch {
       setError("Impossible d'envoyer la commande, réessayez.");
     } finally {
       setBusy(false);
     }
   };
+
+  if (placed) {
+    return (
+      <div className="mx-auto max-w-xl px-4 py-20 text-center" role="status">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-ink text-2xl text-paper">✓</div>
+        <h1 className="mt-5 font-display text-3xl">Commande enregistrée</h1>
+        <p className="mt-2 text-muted">Ouverture du récapitulatif…</p>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
