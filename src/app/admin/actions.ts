@@ -10,12 +10,12 @@ import { CATALOG_TAG } from "@/lib/server/catalog";
 import { garments, type GarmentId } from "@/lib/garments";
 import type { Product, Variant } from "@/lib/products";
 import type { Catalog, Category } from "@/lib/categories";
-import { removeUpload, UPLOAD_URL } from "@/lib/server/uploads";
+import { isUploadUrl, removeUpload } from "@/lib/server/uploads";
 
 type Result = { ok: true } | { ok: false; error: string };
 
 /** n'accepte que les images envoyées via /api/admin/upload */
-const upload = (u: unknown) => (typeof u === "string" && UPLOAD_URL.test(u) ? u : undefined);
+const upload = (u: unknown) => (isUploadUrl(u) ? u : undefined);
 
 /** toutes les images envoyées encore utilisées par le catalogue */
 function usedUploads(c: Catalog) {

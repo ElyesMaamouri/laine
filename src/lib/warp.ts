@@ -16,6 +16,8 @@ export function loadImage(src: string) {
   if (!p) {
     p = new Promise((res, rej) => {
       const im = new Image();
+      // images Cloudinary : nécessaire pour pouvoir les lire dans un canvas (rendu IA)
+      im.crossOrigin = "anonymous";
       im.onload = () => res(im);
       im.onerror = rej;
       im.src = src;

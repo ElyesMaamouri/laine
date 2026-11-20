@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:push": "node scripts/db-push.mjs"
   },
   "dependencies": {
     "@gradio/client": "^2.8.0",

@@ -1,12 +1,12 @@
-import { jobs } from "@/lib/tryon-providers";
+import { getJob } from "@/lib/tryon-providers";
 
 /** Statut d'un essayage IA : processing | completed | failed (FASHN : starting | in_queue | …) */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!/^[\w-]{1,100}$/.test(id)) return Response.json({ status: "failed", error: "Identifiant invalide" }, { status: 400 });
 
-  // tâche Hugging Face en mémoire
-  const job = jobs.get(id);
+  // tâche Hugging Face (Redis en ligne, mémoire en local)
+  const job = await getJob(id);
   if (job) return Response.json({ status: job.status, output: job.output ?? null, error: job.error ?? null });
 
   const key = process.env.FASHN_API_KEY;

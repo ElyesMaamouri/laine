@@ -1,14 +1,70 @@
-/** Images envoyées depuis l'admin, stockées en local dans data/uploads */
+/**
+ * Images envoyées depuis l'admin.
+ *  - en local : dossier data/uploads, servi par /api/uploads/<nom>
+ *  - en ligne : Cloudinary, dès que CLOUDINARY_URL (ou CLOUDINARY_CLOUD_NAME / _API_KEY / _API_SECRET) existe
+ */
 import "server-only";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads");
-export const MAX_UPLOAD = 5 * 1024 * 1024; // 5 Mo
-export const UPLOAD_URL = /^\/api\/uploads\/([0-9a-f-]{36}\.(?:jpg|png|webp))$/;
+/** 4 Mo : Vercel refuse les requêtes de plus de 4,5 Mo */
+export const MAX_UPLOAD = 4 * 1024 * 1024;
+const LOCAL_URL = /^\/api\/uploads\/([0-9a-f-]{36}\.(?:jpg|png|webp))$/;
+export const FOLDER = "laine";
 
 const TYPES = { jpg: "image/jpeg", png: "image/png", webp: "image/webp" } as const;
 export type Ext = keyof typeof TYPES;
+
+/* ---------------- Cloudinary ---------------- */
+
+function cloudinary() {
+  const u = process.env.CLOUDINARY_URL?.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+  if (u) return { key: u[1], secret: u[2], cloud: u[3] };
+  const { CLOUDINARY_CLOUD_NAME: cloud, CLOUDINARY_API_KEY: key, CLOUDINARY_API_SECRET: secret } = process.env;
+  return cloud && key && secret ? { cloud, key, secret } : null;
+}
+export const hasCloudinary = () => !!cloudinary();
+
+/** Signature Cloudinary : sha1 des paramètres triés + secret */
+function sign(params: Record<string, string | number>, secret: string) {
+  const s = Object.keys(params)
+    .sort()
+    .map((k) => `${k}=${params[k]}`)
+    .join("&");
+  return createHash("sha1").update(s + secret).digest("hex");
+}
+
+function cloudinaryUrlRe(cloud: string) {
+  const c = cloud.replace(/[^\w-]/g, "");
+  return new RegExp(`^https://res\\.cloudinary\\.com/${c}/image/upload/(?:v\\d+/)?(${FOLDER}/[\\w-]+/?[\\w-]*)\\.(?:jpg|jpeg|png|webp)$`);
+}
+
+/** Envoie une image sur Cloudinary et renvoie son URL https */
+export async function uploadToCloudinary(buf: Buffer, ext: Ext, sub = "") {
+  const c = cloudinary()!;
+  const params = { folder: sub ? `${FOLDER}/${sub}` : FOLDER, public_id: crypto.randomUUID(), timestamp: Math.floor(Date.now() / 1000) };
+  const fd = new FormData();
+  fd.append("file", new Blob([new Uint8Array(buf)], { type: TYPES[ext] }));
+  for (const [k, v] of Object.entries(params)) fd.append(k, String(v));
+  fd.append("api_key", c.key);
+  fd.append("signature", sign(params, c.secret));
+  const r = await fetch(`https://api.cloudinary.com/v1_1/${c.cloud}/image/upload`, { method: "POST", body: fd });
+  const d = (await r.json().catch(() => ({}))) as { secure_url?: string; error?: { message?: string } };
+  if (!r.ok || !d.secure_url) throw new Error(`Cloudinary : ${d.error?.message ?? r.status}`);
+  return d.secure_url;
+}
+
+/* ---------------- commun ---------------- */
+
+/** Vrai si l'URL vient d'un upload de la boutique (local ou Cloudinary) */
+export function isUploadUrl(u: unknown): u is string {
+  if (typeof u !== "string") return false;
+  if (LOCAL_URL.test(u)) return true;
+  const c = cloudinary();
+  return !!c && cloudinaryUrlRe(c.cloud).test(u);
+}
 
 /** Reconnaît le format réel à partir des premiers octets (pas de confiance dans le nom du fichier) */
 export function detectImage(buf: Buffer): Ext | null {
@@ -19,6 +75,7 @@ export function detectImage(buf: Buffer): Ext | null {
 }
 
 export async function saveUpload(buf: Buffer, ext: Ext) {
+  if (hasCloudinary()) return uploadToCloudinary(buf, ext);
   await mkdir(UPLOAD_DIR, { recursive: true });
   const name = `${crypto.randomUUID()}.${ext}`;
   await writeFile(path.join(UPLOAD_DIR, name), buf);
@@ -35,9 +92,21 @@ export async function readUpload(name: string) {
   }
 }
 
-/** Supprime un fichier envoyé (ignore les URL qui ne sont pas des uploads) */
+/** Supprime une image envoyée (disque ou Cloudinary) ; ignore les autres URL */
 export async function removeUpload(url: string | undefined) {
-  const m = url?.match(UPLOAD_URL);
-  if (!m) return;
-  await unlink(path.join(UPLOAD_DIR, m[1])).catch(() => {});
+  if (!url) return;
+  const local = url.match(LOCAL_URL);
+  if (local) {
+    await unlink(path.join(UPLOAD_DIR, local[1])).catch(() => {});
+    return;
+  }
+  const c = cloudinary();
+  const m = c && url.match(cloudinaryUrlRe(c.cloud));
+  if (!c || !m) return;
+  const params = { public_id: m[1], timestamp: Math.floor(Date.now() / 1000) };
+  const fd = new FormData();
+  for (const [k, v] of Object.entries(params)) fd.append(k, String(v));
+  fd.append("api_key", c.key);
+  fd.append("signature", sign(params, c.secret));
+  await fetch(`https://api.cloudinary.com/v1_1/${c.cloud}/image/destroy`, { method: "POST", body: fd }).catch(() => {});
 }

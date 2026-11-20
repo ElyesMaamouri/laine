@@ -2,10 +2,28 @@
 
 import { useRef, useState } from "react";
 
+/** Réduit les grosses photos (téléphone…) avant l'envoi : 2000 px max, WebP ou JPEG */
+async function shrink(file: File): Promise<Blob> {
+  if (file.size < 1.5 * 1024 * 1024) return file;
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k);
+    c.height = Math.round(bmp.height * k);
+    c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+    const webp = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", 0.88));
+    if (webp && webp.type === "image/webp") return webp;
+    return (await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.88))) ?? file;
+  } catch {
+    return file;
+  }
+}
+
 /** Envoie une image à /api/admin/upload et renvoie son URL */
 export async function uploadFile(file: File): Promise<string> {
   const fd = new FormData();
-  fd.append("file", file);
+  fd.append("file", await shrink(file));
   const r = await fetch("/api/admin/upload", { method: "POST", body: fd });
   const d = await r.json().catch(() => ({}));
   if (!r.ok || !d.url) throw new Error(d.error ?? "Échec de l'envoi.");
@@ -81,7 +99,7 @@ export default function ImageUpload({
               ⇪
             </span>
             {!compact && <span>Cliquer ou glisser une image</span>}
-            {!compact && <span className="text-[11px]">JPG, PNG, WebP · 5 Mo max</span>}
+            {!compact && <span className="text-[11px]">JPG, PNG, WebP · réduite si trop lourde</span>}
           </button>
         )}
         {busy && <div className="absolute inset-0 grid place-items-center bg-white/70 text-xs">Envoi…</div>}

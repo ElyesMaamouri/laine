@@ -1,12 +1,15 @@
 /**
- * Mini base de données JSON (fichier data/db.json) — suffisante pour une démo.
- * En production : remplacer par une vraie base (Postgres, Supabase…).
+ * Mini base de données : un seul document JSON.
+ *  - en local : fichier data/db.json
+ *  - en ligne (Vercel) : clé Redis Upstash, dès que KV_REST_API_URL / KV_REST_API_TOKEN existent
+ * Pour une vraie production : passer à une base relationnelle (Postgres, Supabase…).
  */
 import "server-only";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { seedProducts } from "../products";
 import { seedCategories, type Catalog } from "../categories";
+import { hasRedis, redis } from "./redis";
 
 export type User = { id: string; name: string; email: string; passwordHash: string; createdAt: string };
 
@@ -48,16 +51,26 @@ let queue: Promise<unknown> = Promise.resolve();
 
 const seedCatalog = (): Catalog => structuredClone({ products: seedProducts, categories: seedCategories });
 
+export const REDIS_KEY = "laine:db";
+
 async function load(): Promise<Data> {
   let d: Partial<Data> = {};
   try {
-    d = JSON.parse(await readFile(FILE, "utf8"));
-  } catch {}
+    const raw = hasRedis() ? await redis<string | null>(["GET", REDIS_KEY]) : await readFile(FILE, "utf8");
+    if (raw) d = JSON.parse(raw);
+  } catch (e) {
+    // en ligne, une erreur Redis doit se voir ; en local, fichier absent = premier lancement
+    if (hasRedis()) throw e;
+  }
   // premier lancement : on recopie le catalogue de départ
   return { users: d.users ?? [], orders: d.orders ?? [], catalog: d.catalog ?? seedCatalog() };
 }
 
 async function save(data: Data) {
+  if (hasRedis()) {
+    await redis(["SET", REDIS_KEY, JSON.stringify(data)]);
+    return;
+  }
   await mkdir(path.dirname(FILE), { recursive: true });
   const tmp = `${FILE}.tmp`;
   await writeFile(tmp, JSON.stringify(data, null, 2), "utf8");

@@ -14,6 +14,41 @@ npm run dev
 Ouvrir http://localhost:3000 dans Chrome / Edge et autoriser la caméra.
 La caméra exige `localhost` ou **HTTPS** en production.
 
+## Stockage : local ou en ligne (automatique)
+
+| | En local (aucune clé) | En ligne (clés présentes) |
+|---|---|---|
+| Produits, catégories, commandes, comptes | `data/db.json` | **Upstash Redis** (`KV_REST_API_URL`, `KV_REST_API_TOKEN`) |
+| Images envoyées dans l'admin | `data/uploads/` | **Cloudinary** (`CLOUDINARY_URL`) |
+| Suivi du rendu IA | mémoire du serveur | Upstash Redis |
+
+Sur Vercel, le disque est en lecture seule : **Redis et Cloudinary sont nécessaires** pour que
+les modifications de l'admin, les commandes et les images soient conservées.
+
+## Déployer sur Vercel
+
+1. **Importer le repo** sur [vercel.com/new](https://vercel.com/new) (Next.js est détecté tout seul).
+2. **Redis** : projet Vercel → *Storage* → *Upstash for Redis* (offre gratuite) → *Connect*.
+   `KV_REST_API_URL` et `KV_REST_API_TOKEN` sont ajoutées automatiquement.
+3. **Cloudinary** : créer un compte gratuit, copier l'*API environment variable* du tableau de bord,
+   l'ajouter dans Vercel sous le nom `CLOUDINARY_URL`.
+4. **Autres variables** (Settings → Environment Variables) : `AUTH_SECRET`, `ADMIN_EMAIL`,
+   `ADMIN_PASSWORD`, `TRYON_PROVIDER`, `HF_TOKEN` — voir `.env.example`.
+5. **Redéployer** (Deployments → ⋯ → Redeploy) pour prendre en compte les variables.
+
+### Envoyer la base locale en ligne (optionnel)
+
+Pour retrouver en ligne les produits, catégories et commandes créés en local :
+
+```bash
+# ajouter d'abord KV_REST_API_URL, KV_REST_API_TOKEN et CLOUDINARY_URL dans .env.local
+npm run db:push
+```
+
+Le script envoie les images locales sur Cloudinary, remplace leurs adresses, puis écrit la base dans
+Redis (il demande confirmation si la base en ligne n'est pas vide). Sans envoi, le site en ligne
+démarre avec le catalogue de départ.
+
 ## Comment ça marche
 
 | Étape | Technique | Fichier |

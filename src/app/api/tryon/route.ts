@@ -2,7 +2,11 @@
  * Démarre un essayage IA réaliste.
  * Fournisseur : Hugging Face (gratuit, test) ou FASHN (payant) — voir src/lib/tryon-providers.ts
  */
-import { currentProvider, startHuggingFace } from "@/lib/tryon-providers";
+import { after } from "next/server";
+import { currentProvider, prepareHuggingFace } from "@/lib/tryon-providers";
+
+// la génération continue après la réponse (after) : on laisse jusqu'à 2 min au serveur
+export const maxDuration = 120;
 
 const FASHN_URL = "https://api.fashn.ai/v1";
 const MAX_LEN = 8_000_000; // ~6 Mo par image en base64
@@ -23,7 +27,9 @@ export async function POST(req: Request) {
     typeof body.description === "string" && body.description.length < 200 ? body.description : "knitted wool sweater";
 
   if (currentProvider() === "huggingface") {
-    return Response.json({ id: startHuggingFace(modelImage, garmentImage, description), provider: "huggingface" });
+    const { id, work } = await prepareHuggingFace(modelImage, garmentImage, description);
+    after(work); // sur Vercel, le serveur reste actif jusqu'à la fin de la génération
+    return Response.json({ id, provider: "huggingface" });
   }
 
   const key = process.env.FASHN_API_KEY;
