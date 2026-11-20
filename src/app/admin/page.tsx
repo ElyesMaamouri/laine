@@ -6,6 +6,7 @@ import StatusBadge from "@/components/admin/StatusBadge";
 import { formatPrice } from "@/lib/products";
 import { useState } from "react";
 import { loadDemoData } from "./actions";
+import { RevenueChart, StatusChart, TopProductsChart } from "@/components/admin/Charts";
 
 /** Bouton qui ajoute produits, catégories et commandes de démo (sans rien écraser) */
 function DemoLoader() {
@@ -83,6 +84,13 @@ function Dashboard() {
             <p className="mt-1 text-xs text-muted">{sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* graphiques */}
+      <RevenueChart orders={orders} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <StatusChart orders={orders} />
+        <TopProductsChart orders={orders} />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
