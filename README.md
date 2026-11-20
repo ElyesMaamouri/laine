@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Lainé — boutique de pulls avec essayage virtuel
 
-## Getting Started
+Boutique e-commerce (Next.js 16) où le client choisit un pull, ouvre sa caméra
+et **se voit porter le pull en direct**, puis génère une **photo réaliste de lui habillé par IA**.
 
-First, run the development server:
+## Lancer
 
 ```bash
+npm install
+cp .env.example .env.local   # optionnel
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Ouvrir http://localhost:3000 dans Chrome / Edge et autoriser la caméra.
+La caméra exige `localhost` ou **HTTPS** en production.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Comment ça marche
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Étape | Technique | Fichier |
+|---|---|---|
+| Catalogue, fiche produit, panier | Next.js App Router + localStorage | `src/app`, `src/components/CartProvider.tsx` |
+| Photos produits | vraies photos détourées (PNG) + points clés ; coloris par recoloration | `public/produits`, `src/lib/garments.ts`, `src/lib/products.ts` |
+| Essayage live (aperçu) | MediaPipe Pose (navigateur, gratuit) ; la photo est déformée sur le corps (buste + manches qui suivent les bras), col coupé sous le menton | `src/components/TryOnModal.tsx`, `src/lib/warp.ts` |
+| Rendu réaliste IA | capture caméra + photo du pull → modèle d'essayage IA → photo de la personne habillée | `src/app/api/tryon`, `src/lib/tryon-providers.ts` |
 
-## Learn More
+### Rendu IA : fournisseurs
 
-To learn more about Next.js, take a look at the following resources:
+- **Hugging Face (par défaut, gratuit)** : modèle open source IDM-VTON. ~30 s par image,
+  quota gratuit limité par jour, parfois saturé. Un jeton gratuit `HF_TOKEN` donne plus d'essais.
+  Les tâches sont gardées en mémoire : idéal pour tester / faire une démo, pas pour la production.
+- **FASHN (payant)** : renseigner `FASHN_API_KEY` (ou `TRYON_PROVIDER=fashn`).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Ajouter un pull
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Photo à plat, de face, fond uni clair, manches visibles → PNG détouré dans `public/produits`.
+2. Ajouter ses points clés (col, épaules, aisselles, coudes, poignets, bas) dans `src/lib/garments.ts`.
+3. Ajouter le produit et ses coloris (`tint` / `filter`) dans `src/lib/products.ts`.
 
-## Deploy on Vercel
+### Crédits photos
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Photos de Wikimedia Commons (licences CC BY / CC BY-SA, crédits affichés en pied de page).
