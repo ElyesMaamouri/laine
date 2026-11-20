@@ -122,10 +122,20 @@ export async function removeUpload(url: string | undefined) {
   const c = cloudinary();
   const m = c && url.match(cloudinaryUrlRe(c.cloud));
   if (!c || !m) return;
-  const params = { public_id: m[1], timestamp: Math.floor(Date.now() / 1000) };
+  // invalidate : vide aussi le cache du CDN, sinon l'image reste visible un moment
+  const params = { invalidate: "true", public_id: m[1], timestamp: Math.floor(Date.now() / 1000) };
   const fd = new FormData();
   for (const [k, v] of Object.entries(params)) fd.append(k, String(v));
   fd.append("api_key", c.key);
   fd.append("signature", sign(params, c.secret));
-  await fetch(`https://api.cloudinary.com/v1_1/${c.cloud}/image/destroy`, { method: "POST", body: fd }).catch(() => {});
+  try {
+    const r = await fetch(`https://api.cloudinary.com/v1_1/${c.cloud}/image/destroy`, { method: "POST", body: fd });
+    const d = (await r.json().catch(() => ({}))) as { result?: string; error?: { message?: string } };
+    // « not found » = déjà supprimée : pas une erreur
+    if (!r.ok || (d.result !== "ok" && d.result !== "not found")) {
+      console.warn("[upload] suppression Cloudinary échouée", m[1], d.error?.message ?? d.result ?? r.status);
+    }
+  } catch (e) {
+    console.warn("[upload] suppression Cloudinary échouée", m[1], e);
+  }
 }
