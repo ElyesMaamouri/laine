@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCategory, productsIn } from "@/lib/categories";
 import { getCatalog } from "@/lib/server/catalog";
-import ProductCard from "@/components/ProductCard";
+import CategoryGrid from "@/components/CategoryGrid";
 import CategoryChips from "@/components/CategoryChips";
 
 export const instant = false;
@@ -42,9 +42,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
       {list.length === 0 ? (
         <p className="rounded-xl border border-line bg-white p-8 text-center text-muted">Aucun pull dans cette catégorie pour le moment.</p>
       ) : (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-3">
-          {list.flatMap((p) => p.variants.map((v) => <ProductCard key={`${p.id}-${v.id}`} p={p} v={v} />))}
-        </div>
+        <CategoryGrid products={list} />
       )}
     </div>
   );

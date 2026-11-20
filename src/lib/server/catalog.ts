@@ -14,3 +14,10 @@ export async function getCatalog(): Promise<Catalog> {
   cacheTag(CATALOG_TAG);
   return read((d) => d.catalog);
 }
+
+/** Sections de la page d'accueil (même étiquette de cache : rafraîchies avec l'admin) */
+export async function getHome() {
+  "use cache";
+  cacheTag(CATALOG_TAG);
+  return read((d) => d.home);
+}

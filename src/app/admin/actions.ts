@@ -10,6 +10,8 @@ import { CATALOG_TAG } from "@/lib/server/catalog";
 import { garments, type GarmentId } from "@/lib/garments";
 import type { Product, Variant } from "@/lib/products";
 import type { Catalog, Category } from "@/lib/categories";
+import { checkPromoInput, type PromoCode } from "@/lib/promos";
+import type { HomeSection } from "@/lib/home";
 import { isUploadUrl, removeUpload } from "@/lib/server/uploads";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -18,8 +20,12 @@ type Result = { ok: true } | { ok: false; error: string };
 const upload = (u: unknown) => (isUploadUrl(u) ? u : undefined);
 
 /** toutes les images envoyées encore utilisées par le catalogue */
-function usedUploads(c: Catalog) {
+function usedUploads(c: Catalog, home: HomeSection[] = []) {
   const s = new Set<string>();
+  for (const sec of home) {
+    const img = (sec.data as { image?: string }).image;
+    if (img) s.add(img);
+  }
   for (const p of c.products) {
     for (const u of p.photos ?? []) s.add(u);
     for (const v of p.variants) if (v.photo) s.add(v.photo);
@@ -30,7 +36,7 @@ function usedUploads(c: Catalog) {
 
 /** supprime du disque les images qui ne sont plus utilisées après une modification */
 async function cleanUploads(before: Set<string>) {
-  const after = await read((d) => usedUploads(d.catalog));
+  const after = await read((d) => usedUploads(d.catalog, d.home));
   await Promise.all([...before].filter((u) => !after.has(u)).map(removeUpload));
 }
 
@@ -74,9 +80,9 @@ export async function adminCheck() {
 
 /* ---------------- lecture ---------------- */
 
-export async function getAdminData(): Promise<{ catalog: Catalog; orders: Order[] }> {
+export async function getAdminData(): Promise<{ catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[] }> {
   await guard();
-  return read((d) => ({ catalog: d.catalog, orders: [...d.orders].reverse() }));
+  return read((d) => ({ catalog: d.catalog, orders: [...d.orders].reverse(), promos: d.promos, home: d.home }));
 }
 
 /* ---------------- produits ---------------- */
@@ -122,7 +128,7 @@ export async function saveProduct(input: Product, originalId: string | null): Pr
   const photos = (input.photos ?? []).map(upload).filter((u): u is string => !!u).slice(0, 8);
   if (photos.length !== Math.min(8, (input.photos ?? []).length) || (input.variants ?? []).some((v) => v.photo && !upload(v.photo)))
     return { ok: false, error: "Une image a été refusée (adresse inattendue). Renvoyez-la puis réessayez." };
-  const before = await read((d) => usedUploads(d.catalog));
+  const before = await read((d) => usedUploads(d.catalog, d.home));
 
   const result = await write((d) => {
     const cats = new Set(d.catalog.categories.map((c) => c.slug));
@@ -169,7 +175,7 @@ export async function saveProduct(input: Product, originalId: string | null): Pr
 
 export async function deleteProduct(id: string): Promise<Result> {
   await guard();
-  const before = await read((d) => usedUploads(d.catalog));
+  const before = await read((d) => usedUploads(d.catalog, d.home));
   await write((d) => {
     d.catalog.products = d.catalog.products.filter((p) => p.id !== id);
     for (const c of d.catalog.categories) if (c.cover?.productId === id) delete c.cover;
@@ -189,7 +195,7 @@ export async function saveCategory(input: Category, originalSlug: string | null)
   const description = String(input.description ?? "").trim().slice(0, 200);
   const image = upload(input.image);
   if (input.image && !image) return { ok: false, error: "Image refusée : adresse inattendue. Renvoyez l'image puis réessayez." };
-  const before = await read((d) => usedUploads(d.catalog));
+  const before = await read((d) => usedUploads(d.catalog, d.home));
 
   const res = await write((d) => {
     if (d.catalog.categories.some((c) => c.slug === slug && c.slug !== originalSlug)) return "Ce lien (slug) est déjà utilisé.";
@@ -216,7 +222,7 @@ export async function saveCategory(input: Category, originalSlug: string | null)
 
 export async function deleteCategory(slug: string): Promise<Result> {
   await guard();
-  const before = await read((d) => usedUploads(d.catalog));
+  const before = await read((d) => usedUploads(d.catalog, d.home));
   await write((d) => {
     d.catalog.categories = d.catalog.categories.filter((c) => c.slug !== slug);
     for (const p of d.catalog.products) p.tags = p.tags.filter((t) => t !== slug);
@@ -246,9 +252,15 @@ export async function moveCategory(slug: string, dir: -1 | 1): Promise<Result> {
  * Ajoute produits, catégories et commandes de démo SANS rien écraser :
  * les produits et catégories déjà présents (même identifiant) sont ignorés.
  */
-export async function loadDemoData(orderCount = 20): Promise<Result & { added?: { products: number; categories: number; orders: number } }> {
+export async function loadDemoData(
+  orderCount = 20,
+): Promise<Result & { added?: { products: number; categories: number; orders: number; promos: number } }> {
   await guard();
-  const { demoProducts, demoCategories, demoOrderDrafts } = await import("@/lib/demo-data");
+  const demo = await import("@/lib/demo-data");
+  const { demoOrderDrafts } = demo;
+  const demoProducts = [...demo.demoProducts, ...demo.demoProducts2];
+  const demoCategories = [...demo.demoCategories, ...demo.demoCategories2];
+  const { parisToday } = await import("@/lib/promos");
   const { priceLines } = await import("@/lib/pricing");
   const n = Math.max(0, Math.min(50, Math.floor(orderCount)));
 
@@ -278,7 +290,10 @@ export async function loadDemoData(orderCount = 20): Promise<Result & { added?: 
       });
       orders++;
     }
-    return { products: prods.length, categories: cats.length, orders };
+    // codes promo d'exemple (ignorés s'ils existent déjà)
+    const promos = demo.demoPromos(parisToday()).filter((p) => !d.promos.some((x) => x.code === p.code));
+    d.promos.push(...structuredClone(promos as unknown as PromoCode[]));
+    return { products: prods.length, categories: cats.length, orders, promos: promos.length };
   });
   updateTag(CATALOG_TAG);
   return { ok: true, added };
@@ -295,4 +310,85 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<R
     return !!o;
   });
   return found ? { ok: true } : { ok: false, error: "Commande introuvable." };
+}
+
+/* ---------------- codes promo ---------------- */
+
+export async function savePromo(input: PromoCode, originalCode: string | null): Promise<Result> {
+  await guard();
+  const p: PromoCode = {
+    code: String(input.code ?? "").trim().toUpperCase(),
+    type: input.type === "fixed" ? "fixed" : "percent",
+    value: Math.round(Number(input.value) * 100) / 100,
+    startsAt: String(input.startsAt ?? ""),
+    endsAt: String(input.endsAt ?? ""),
+    minSubtotal: input.minSubtotal ? Number(input.minSubtotal) : undefined,
+    maxUses: input.maxUses ? Math.floor(Number(input.maxUses)) : undefined,
+    uses: 0,
+    active: input.active !== false,
+    createdAt: new Date().toISOString(),
+  };
+  const err = checkPromoInput(p);
+  if (err) return { ok: false, error: err };
+
+  const res = await write((d) => {
+    if (d.promos.some((x) => x.code === p.code && x.code !== originalCode)) return "Ce code existe déjà.";
+    const i = d.promos.findIndex((x) => x.code === originalCode);
+    if (originalCode && i < 0) return "Code introuvable.";
+    if (i >= 0) d.promos[i] = { ...p, uses: d.promos[i].uses, createdAt: d.promos[i].createdAt };
+    else d.promos.unshift(p);
+    return null;
+  });
+  return res ? { ok: false, error: res } : { ok: true };
+}
+
+export async function deletePromo(code: string): Promise<Result> {
+  await guard();
+  await write((d) => {
+    d.promos = d.promos.filter((p) => p.code !== code);
+  });
+  return { ok: true };
+}
+
+export async function togglePromo(code: string): Promise<Result> {
+  await guard();
+  await write((d) => {
+    const p = d.promos.find((x) => x.code === code);
+    if (p) p.active = !p.active;
+  });
+  return { ok: true };
+}
+
+/* ---------------- page d'accueil ---------------- */
+
+export async function saveHome(sections: HomeSection[]): Promise<Result> {
+  await guard();
+  if (!Array.isArray(sections) || sections.length > 30) return { ok: false, error: "Données invalides." };
+  const { defaultHome } = await import("@/lib/home");
+  const types = new Set(defaultHome.map((s) => s.type));
+  const clean = sections.filter((s) => s && types.has(s.type) && typeof s.id === "string");
+  // images : seules les images envoyées via l'admin sont acceptées
+  for (const s of clean) {
+    const data = s.data as { image?: string };
+    if (data.image && !upload(data.image)) delete data.image;
+  }
+  const before = await read((d) => usedUploads(d.catalog, d.home));
+  await write((d) => {
+    d.home = structuredClone(clean);
+  });
+  await cleanUploads(before);
+  updateTag(CATALOG_TAG);
+  return { ok: true };
+}
+
+export async function resetHome(): Promise<Result> {
+  await guard();
+  const { defaultHome } = await import("@/lib/home");
+  const before = await read((d) => usedUploads(d.catalog, d.home));
+  await write((d) => {
+    d.home = structuredClone(defaultHome);
+  });
+  await cleanUploads(before);
+  updateTag(CATALOG_TAG);
+  return { ok: true };
 }

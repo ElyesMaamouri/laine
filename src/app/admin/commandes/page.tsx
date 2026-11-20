@@ -6,6 +6,7 @@ import StatusBadge from "@/components/admin/StatusBadge";
 import { setOrderStatus } from "../actions";
 import { formatPrice } from "@/lib/products";
 import type { OrderStatus } from "@/lib/server/db";
+import Pagination, { usePaged } from "@/components/Pagination";
 
 const STATUSES: OrderStatus[] = ["nouvelle", "confirmée", "expédiée", "livrée", "annulée"];
 
@@ -22,13 +23,13 @@ function Orders() {
   const [filter, setFilter] = useState<OrderStatus | "toutes">("toutes");
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(null);
-  if (!data) return null;
-
-  const list = data.orders.filter(
+  const list = (data?.orders ?? []).filter(
     (o) =>
       (filter === "toutes" || o.status === filter) &&
-      `${o.number} ${o.customer.name} ${o.customer.phone} ${o.customer.city}`.toLowerCase().includes(q.toLowerCase()),
+      `${o.number} ${o.customer.name} ${o.customer.phone} ${o.customer.city} ${o.promoCode ?? ""}`.toLowerCase().includes(q.toLowerCase()),
   );
+  const paged = usePaged(list, 15, `${filter}|${q}`);
+  if (!data) return null;
   const count = (s: OrderStatus) => data.orders.filter((o) => o.status === s).length;
 
   const change = async (id: string, status: OrderStatus) => {
@@ -70,7 +71,7 @@ function Orders() {
             </tr>
           </thead>
           <tbody>
-            {list.map((o) => (
+            {paged.items.map((o) => (
               <FragmentRow key={o.id}>
                 <tr className="cursor-pointer border-t border-line hover:bg-mist/60" onClick={() => setOpen(open === o.id ? null : o.id)}>
                   <td className="p-4 font-medium">{o.number}</td>
@@ -115,7 +116,7 @@ function Orders() {
                             ))}
                           </ul>
                           <p className="mt-3 border-t border-line pt-2 text-muted">
-                            Sous-total {formatPrice(o.subtotal)} · Livraison {o.shipping ? formatPrice(o.shipping) : "offerte"} · <strong className="text-ink">Total {formatPrice(o.total)}</strong>
+                            Sous-total {formatPrice(o.subtotal)}{o.discount ? ` · Code ${o.promoCode} -${formatPrice(o.discount)}` : ""} · Livraison {o.shipping ? formatPrice(o.shipping) : "offerte"} · <strong className="text-ink">Total {formatPrice(o.total)}</strong>
                           </p>
                         </div>
                         <div>
@@ -144,6 +145,7 @@ function Orders() {
           </tbody>
         </table>
       </div>
+      <Pagination page={paged.page} pages={paged.pages} onChange={paged.setPage} total={paged.total} perPage={15} />
     </div>
   );
 }

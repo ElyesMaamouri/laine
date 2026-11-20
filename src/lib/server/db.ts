@@ -10,6 +10,8 @@ import path from "node:path";
 import { seedProducts } from "../products";
 import { seedCategories, type Catalog } from "../categories";
 import { hasRedis, redis } from "./redis";
+import type { PromoCode } from "../promos";
+import { withDefaults, type HomeSection } from "../home";
 
 export type User = { id: string; name: string; email: string; passwordHash: string; createdAt: string };
 
@@ -33,6 +35,9 @@ export type Order = {
   customer: Customer;
   items: OrderItem[];
   subtotal: number;
+  /** remise du code promo (0 sans code) */
+  discount?: number;
+  promoCode?: string;
   shipping: number;
   total: number;
   payment: "cod";
@@ -44,7 +49,7 @@ export type Order = {
 export const ORDER_STATUSES = ["nouvelle", "confirmée", "expédiée", "livrée", "annulée"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-type Data = { users: User[]; orders: Order[]; catalog: Catalog };
+export type Data = { users: User[]; orders: Order[]; catalog: Catalog; promos: PromoCode[]; home: HomeSection[] };
 
 const FILE = path.join(process.cwd(), "data", "db.json");
 let queue: Promise<unknown> = Promise.resolve();
@@ -63,7 +68,13 @@ async function load(): Promise<Data> {
     if (hasRedis()) throw e;
   }
   // premier lancement : on recopie le catalogue de départ
-  return { users: d.users ?? [], orders: d.orders ?? [], catalog: d.catalog ?? seedCatalog() };
+  return {
+    users: d.users ?? [],
+    orders: d.orders ?? [],
+    catalog: d.catalog ?? seedCatalog(),
+    promos: d.promos ?? [],
+    home: withDefaults(d.home),
+  };
 }
 
 async function save(data: Data) {

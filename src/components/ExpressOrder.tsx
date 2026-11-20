@@ -6,7 +6,8 @@ import { useAuth } from "./AuthProvider";
 import CustomerForm, { emptyCustomer, type CustomerInput } from "./CustomerForm";
 import Totals from "./Totals";
 import { formatPrice, type Product, type Variant } from "@/lib/products";
-import { priceLines } from "@/lib/pricing";
+import { priceLines, withDiscount } from "@/lib/pricing";
+import PromoInput, { type AppliedPromo } from "./PromoInput";
 import { useCatalog } from "./CatalogProvider";
 
 /** Formulaire de commande rapide, directement sur la fiche produit */
@@ -16,6 +17,7 @@ export default function ExpressOrder({ product, variant, size, onMissingSize }: 
   const { products } = useCatalog();
   const [qty, setQty] = useState(1);
   const [customer, setCustomer] = useState<CustomerInput>(emptyCustomer);
+  const [promo, setPromo] = useState<AppliedPromo>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,6 +30,7 @@ export default function ExpressOrder({ product, variant, size, onMissingSize }: 
 
   const line = { productId: product.id, variantId: variant.id, size: size ?? product.sizes[0], qty };
   const priced = priceLines([line], products);
+  const totals = withDiscount(priced.subtotal, promo?.discount ?? 0);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,12 +46,13 @@ export default function ExpressOrder({ product, variant, size, onMissingSize }: 
       const r = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customer, items: [line], source: "express" }),
+        body: JSON.stringify({ customer, items: [line], source: "express", promoCode: promo?.code }),
       });
       const d = await r.json();
       if (!r.ok) {
         setErrors(d.errors ?? {});
-        setError("Vérifiez les champs en rouge.");
+        if (d.errors?.promo) setPromo(null);
+        setError(d.errors?.promo ?? "Vérifiez les champs en rouge.");
         return;
       }
       router.push(`/commande/confirmation?id=${d.id}`);
@@ -77,10 +81,11 @@ export default function ExpressOrder({ product, variant, size, onMissingSize }: 
         </div>
 
         <CustomerForm value={customer} onChange={setCustomer} errors={errors} compact />
-        <Totals subtotal={priced.subtotal} shipping={priced.shipping} total={priced.total} />
+        <PromoInput lines={[line]} applied={promo} onChange={setPromo} />
+        <Totals {...totals} promoCode={promo?.code} />
         {error && <p className="rounded-lg bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p>}
         <button disabled={busy} className="h-12 w-full rounded-full bg-clay text-sm font-medium text-white hover:brightness-95 disabled:opacity-50">
-          {busy ? "Envoi…" : `Commander maintenant · ${formatPrice(priced.total)}`}
+          {busy ? "Envoi…" : `Commander maintenant · ${formatPrice(totals.total)}`}
         </button>
       </form>
     </section>

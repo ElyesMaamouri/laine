@@ -41,23 +41,32 @@ export async function POST(req: Request) {
   if (priced.items.length === 0) errors.items = "Votre commande est vide.";
   if (Object.keys(errors).length) return Response.json({ errors }, { status: 400 });
 
+  const promoCode = String(body.promoCode ?? "").trim().toUpperCase().slice(0, 20);
   const user = await currentUser();
-  const order = await write((d) => {
+  const result = await write((d) => {
+    // le code promo est revérifié ici, au moment d'enregistrer (dates, minimum, utilisations)
+    const promo = promoCode ? d.promos.find((p) => p.code === promoCode) : null;
+    const final = priceLines(lines, d.catalog.products, promo);
+    if (promoCode && !final.promoCode) return { error: final.promoError ?? "Ce code promo n'est pas valable." };
+    if (promo && final.promoCode) promo.uses += 1;
+    const { promoError: _ignored, ...totals } = final;
+    void _ignored;
     const o: Order = {
       id: crypto.randomUUID(),
       number: `MA-${String(d.orders.length + 1001)}`,
       userId: user?.id ?? null,
       customer,
-      ...priced,
+      ...totals,
       payment: "cod",
       status: "nouvelle",
       source: body.source === "express" ? "express" : "checkout",
       createdAt: new Date().toISOString(),
     };
     d.orders.push(o);
-    return o;
+    return { order: o };
   });
-  return Response.json({ id: order.id, number: order.number });
+  if ("error" in result) return Response.json({ errors: { promo: result.error } }, { status: 400 });
+  return Response.json({ id: result.order.id, number: result.order.number });
 }
 
 /** Commandes de l'utilisateur connecté */

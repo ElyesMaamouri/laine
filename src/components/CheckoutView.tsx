@@ -8,7 +8,8 @@ import { useAuth } from "./AuthProvider";
 import CustomerForm, { emptyCustomer, type CustomerInput } from "./CustomerForm";
 import Totals from "./Totals";
 import { formatPrice } from "@/lib/products";
-import { priceLines } from "@/lib/pricing";
+import { priceLines, withDiscount } from "@/lib/pricing";
+import PromoInput, { type AppliedPromo } from "./PromoInput";
 import { useCatalog } from "./CatalogProvider";
 
 export default function CheckoutView() {
@@ -16,11 +17,13 @@ export default function CheckoutView() {
   const { items, clear } = useCart();
   const { user, loading } = useAuth();
   const [customer, setCustomer] = useState<CustomerInput>(emptyCustomer);
+  const [promo, setPromo] = useState<AppliedPromo>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const { products } = useCatalog();
   const priced = priceLines(items, products);
+  const totals = withDiscount(priced.subtotal, promo?.discount ?? 0);
 
   // pré-remplit nom et e-mail du compte connecté
   useEffect(() => {
@@ -38,12 +41,13 @@ export default function CheckoutView() {
       const r = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customer, items, source: "checkout" }),
+        body: JSON.stringify({ customer, items, source: "checkout", promoCode: promo?.code }),
       });
       const d = await r.json();
       if (!r.ok) {
         setErrors(d.errors ?? {});
-        setError(d.errors?.items ?? "Vérifiez les champs en rouge.");
+        if (d.errors?.promo) setPromo(null);
+        setError(d.errors?.promo ?? d.errors?.items ?? "Vérifiez les champs en rouge.");
         return;
       }
       clear();
@@ -106,10 +110,13 @@ export default function CheckoutView() {
               </li>
             ))}
           </ul>
-          <Totals subtotal={priced.subtotal} shipping={priced.shipping} total={priced.total} />
+          <div className="mb-4">
+            <PromoInput lines={items} applied={promo} onChange={setPromo} />
+          </div>
+          <Totals {...totals} promoCode={promo?.code} />
           {error && <p className="mt-4 rounded-lg bg-clay/10 px-3 py-2 text-sm text-clay">{error}</p>}
           <button disabled={busy} className="mt-6 h-12 w-full rounded-full bg-ink text-sm font-medium text-paper hover:bg-black disabled:opacity-50">
-            {busy ? "Envoi…" : `Confirmer la commande · ${formatPrice(priced.total)}`}
+            {busy ? "Envoi…" : `Confirmer la commande · ${formatPrice(totals.total)}`}
           </button>
         </aside>
       </form>

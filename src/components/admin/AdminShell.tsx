@@ -6,8 +6,10 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { adminCheck, adminLogout, getAdminData } from "@/app/admin/actions";
 import type { Catalog } from "@/lib/categories";
 import type { Order } from "@/lib/server/db";
+import type { PromoCode } from "@/lib/promos";
+import type { HomeSection } from "@/lib/home";
 
-type AdminData = { catalog: Catalog; orders: Order[] };
+type AdminData = { catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[] };
 const Ctx = createContext<{ data: AdminData | null; reload: () => Promise<void> }>({ data: null, reload: async () => {} });
 export const useAdmin = () => useContext(Ctx);
 
@@ -16,6 +18,8 @@ const NAV = [
   ["/admin/produits", "Produits", "◫"],
   ["/admin/categories", "Catégories", "▤"],
   ["/admin/commandes", "Commandes", "☰"],
+  ["/admin/promos", "Codes promo", "%"],
+  ["/admin/accueil", "Page d'accueil", "⌂"],
 ] as const;
 
 /** Cadre du tableau de bord : vérifie la session admin, charge les données, affiche le menu */

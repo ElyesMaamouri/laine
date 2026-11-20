@@ -11,6 +11,8 @@ type Order = {
   customer: { name: string; email: string; phone: string; address: string; city: string; zip: string };
   items: { productId: string; variantId: string; name: string; variant: string; size: string; qty: number; lineTotal: number }[];
   subtotal: number;
+  discount?: number;
+  promoCode?: string;
   shipping: number;
   total: number;
 };
@@ -63,7 +65,7 @@ export default function ConfirmationView() {
             </li>
           ))}
         </ul>
-        <Totals subtotal={order.subtotal} shipping={order.shipping} total={order.total} />
+        <Totals subtotal={order.subtotal} discount={order.discount} promoCode={order.promoCode} shipping={order.shipping} total={order.total} />
         <div className="mt-6 border-t border-line pt-4 text-sm">
           <p className="font-medium">Livraison</p>
           <p className="text-muted">

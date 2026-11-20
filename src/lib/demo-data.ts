@@ -178,3 +178,104 @@ export function demoOrderDrafts(products: Product[], count = 20, days = 21, seed
   }
   return list.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
+
+/* ---------------- pack 2 : 30 produits, 7 catégories, codes promo ---------------- */
+
+export const demoCategories2: Category[] = [
+  { slug: "hiver", name: "Spécial hiver", description: "Mailles épaisses et cols montants pour affronter le froid." },
+  { slug: "mi-saison", name: "Mi-saison", description: "Mailles légères pour le printemps et l'automne." },
+  { slug: "best-sellers", name: "Best-sellers", description: "Les pulls préférés de nos clients." },
+  { slug: "tons-neutres", name: "Tons neutres", description: "Écru, gris, camel et noir : les couleurs qui vont avec tout." },
+  { slug: "couleurs-vives", name: "Couleurs vives", description: "Des teintes franches pour réveiller l'hiver." },
+  { slug: "coton", name: "Coton", description: "Coton doux et respirant, facile à entretenir." },
+  { slug: "grandes-tailles", name: "Grandes tailles", description: "Modèles disponibles jusqu'au XXL." },
+];
+
+type V = Product["variants"][number];
+const T = (id: string, name: string, swatch: string, tint = swatch): V => ({ id, name, swatch, tint });
+const F = (id: string, name: string, swatch: string, filter: string, tint?: string): V => ({ id, name, swatch, filter, ...(tint ? { tint } : {}) });
+
+/** Palettes réutilisables (recoloration des 3 photos de base) */
+const P = {
+  neutresRond: [T("ecru", "Écru", "#ece1c8", "#f2e6cc"), T("gris-clair", "Gris clair", "#c4c2bf", "#cfccc8"), T("camel", "Camel", "#b98656", "#c8915a"), T("noir", "Noir", "#2b2b2d", "#3a3a3d")],
+  vivesRond: [T("rouge", "Rouge", "#c0392b", "#d0473a"), T("jaune", "Jaune soleil", "#e3b23c", "#eec04a"), T("bleu-roi", "Bleu roi", "#2f55b0", "#3b63c2"), T("vert-gazon", "Vert gazon", "#4f9a4a", "#5eab57")],
+  pastelsRond: [T("rose", "Rose poudré", "#e2aea8", "#eeb0a8"), T("lilas", "Lilas", "#b3a1cc", "#bfaedb"), T("bleu-ciel", "Bleu ciel", "#93bde3", "#a2c8ec"), T("menthe", "Menthe", "#9fd0bd", "#acdcc9")],
+  terreRond: [T("terracotta", "Terracotta", "#c27450", "#d0825d"), T("kaki", "Kaki", "#7d7d52", "#8f8f5e"), T("rouille", "Rouille", "#a5532f", "#b6603a"), T("sable", "Sable", "#d8c29b", "#e2cba3")],
+  colV: [F("vert", "Vert anglais", "#2f6b45", "brightness(1)"), F("marine", "Marine", "#263759", "hue-rotate(95deg) saturate(1.1) brightness(0.7)"), F("bordeaux", "Bordeaux", "#6b2433", "hue-rotate(-140deg) saturate(1.1) brightness(0.8)"), F("gris", "Gris chiné", "#8b8c8f", "grayscale(1) brightness(1.15)")],
+  colVClair: [F("craie", "Craie", "#dedbd2", "grayscale(1) brightness(2.1) contrast(0.8)"), F("bleu-ciel", "Bleu ciel", "#8fb3d9", "hue-rotate(95deg) saturate(0.7) brightness(1.6)"), F("sauge", "Sauge", "#9fb08f", "saturate(0.5) brightness(1.5)")],
+  colRoule: [F("taupe", "Taupe", "#857c6c", "brightness(1)"), F("noir", "Noir", "#232325", "grayscale(1) brightness(0.45)"), F("creme", "Crème", "#d9d0bd", "brightness(1.55) saturate(0.7)"), F("marine", "Marine", "#2d3550", "grayscale(1) brightness(1.1)", "#55608c")],
+  colRouleCouleur: [F("bordeaux", "Bordeaux", "#6e2632", "grayscale(1) brightness(1.3)", "#94404d"), F("moutarde", "Moutarde", "#b8892e", "grayscale(1) brightness(1.5)", "#d6a443"), F("vert-foret", "Vert forêt", "#3f5a3f", "grayscale(1) brightness(1.2)", "#5e7a5a")],
+};
+
+type Spec = [id: string, name: string, cat: string, price: number, garment: Product["garment"], palette: V[], tags: string[], material: string, extra?: Partial<Product>];
+
+const SPECS: Spec[] = [
+  ["pull-col-rond-merinos", "Pull col rond Mérinos", "Mixte · Mérinos", 75, "blanc", P.neutresRond, ["femme", "homme", "col-rond", "tons-neutres", "mi-saison"], "100% laine mérinos"],
+  ["pull-col-rond-cotele", "Pull col rond côtelé", "Femme · Laine", 69, "blanc", P.pastelsRond, ["femme", "col-rond", "mi-saison"], "70% laine, 30% coton"],
+  ["pull-col-rond-alpaga", "Pull col rond Alpaga", "Mixte · Alpaga", 115, "blanc", P.neutresRond, ["femme", "homme", "col-rond", "hiver", "tons-neutres"], "60% alpaga, 40% laine", { badge: "Premium" }],
+  ["pull-couleur-vive", "Pull Couleur vive", "Mixte · Coton", 59, "blanc", P.vivesRond, ["femme", "homme", "col-rond", "couleurs-vives", "coton", "petits-prix"], "100% coton peigné", { badge: "Nouveau" }],
+  ["pull-pastel-douceur", "Pull Pastel douceur", "Femme · Coton", 55, "blanc", P.pastelsRond, ["femme", "col-rond", "coton", "petits-prix", "mi-saison"], "100% coton bio"],
+  ["pull-terre-cuite", "Pull Terre cuite", "Mixte · Laine", 79, "blanc", P.terreRond, ["femme", "homme", "col-rond", "tons-neutres"], "80% laine, 20% nylon recyclé"],
+  ["pull-oversize-douillet", "Pull oversize douillet", "Femme · Laine", 85, "blanc", P.terreRond, ["femme", "col-rond", "oversize", "hiver"], "70% laine, 30% alpaga", { oldPrice: 105, badge: "-19%" }],
+  ["pull-col-rond-grandes-tailles", "Pull col rond Confort", "Mixte · Coton", 62, "blanc", P.neutresRond, ["femme", "homme", "col-rond", "grandes-tailles", "coton"], "100% coton", { sizes: ["M", "L", "XL", "XXL"] }],
+  ["pull-enfant-couleurs", "Pull enfant Arc-en-ciel", "Enfant · Coton", 35, "blanc", P.vivesRond, ["enfant", "col-rond", "couleurs-vives", "petits-prix"], "100% coton bio", { sizes: ["XS", "S", "M"] }],
+  ["pull-enfant-pastel", "Pull enfant Pastel", "Enfant · Coton", 35, "blanc", P.pastelsRond, ["enfant", "col-rond", "petits-prix"], "100% coton bio", { sizes: ["XS", "S", "M"] }],
+  ["pull-cachemire-fin", "Pull Cachemire fin", "Femme · Cachemire", 149, "blanc", P.pastelsRond, ["femme", "col-rond", "cachemire"], "100% cachemire", { badge: "Premium" }],
+  ["pull-cachemire-homme", "Pull Cachemire homme", "Homme · Cachemire", 159, "blanc", P.neutresRond, ["homme", "col-rond", "cachemire", "tons-neutres"], "100% cachemire"],
+  ["pull-best-seller-rond", "Pull Iconique", "Mixte · Laine", 69, "blanc", P.neutresRond, ["femme", "homme", "col-rond", "best-sellers", "basiques"], "70% laine, 30% coton", { badge: "Best-seller" }],
+  ["pull-col-v-classique", "Pull col V Classique", "Homme · Laine", 72, "colV", P.colV, ["homme", "col-v", "basiques", "best-sellers"], "100% laine d'agneau", { badge: "Best-seller" }],
+  ["pull-col-v-cachemire", "Pull col V Cachemire", "Homme · Cachemire", 139, "colV", P.colV, ["homme", "col-v", "cachemire"], "100% cachemire", { badge: "Premium" }],
+  ["pull-col-v-coton", "Pull col V Coton", "Mixte · Coton", 58, "colV", P.colVClair, ["homme", "femme", "col-v", "coton", "petits-prix", "mi-saison"], "100% coton"],
+  ["pull-col-v-ample", "Pull col V Ample", "Femme · Laine", 82, "colV", P.colVClair, ["femme", "col-v", "oversize"], "70% laine, 30% coton"],
+  ["pull-col-v-grandes-tailles", "Pull col V Confort", "Homme · Laine", 76, "colV", P.colV, ["homme", "col-v", "grandes-tailles"], "100% laine", { sizes: ["L", "XL", "XXL"] }],
+  ["pull-col-v-promo", "Pull col V Essentiel", "Mixte · Laine", 49, "colV", P.colV, ["homme", "femme", "col-v", "promotions", "petits-prix"], "80% laine, 20% polyamide", { oldPrice: 69, badge: "-29%" }],
+  ["pull-col-v-merinos-femme", "Pull col V Mérinos femme", "Femme · Mérinos", 79, "colV", P.colVClair, ["femme", "col-v", "mi-saison"], "100% laine mérinos", { badge: "Nouveau" }],
+  ["col-roule-classique", "Col roulé Classique", "Mixte · Laine", 89, "colRoule", P.colRoule, ["femme", "homme", "col-roule", "hiver", "tons-neutres", "best-sellers"], "80% laine, 20% alpaga", { badge: "Best-seller" }],
+  ["col-roule-couleur", "Col roulé Couleur", "Femme · Laine", 92, "colRoule", P.colRouleCouleur, ["femme", "col-roule", "couleurs-vives", "hiver"], "80% laine, 20% alpaga"],
+  ["col-roule-cachemire", "Col roulé Cachemire", "Mixte · Cachemire", 169, "colRoule", P.colRoule, ["femme", "homme", "col-roule", "cachemire", "hiver"], "100% cachemire", { badge: "Premium" }],
+  ["col-roule-montagne", "Col roulé Montagne", "Homme · Laine épaisse", 119, "colRoule", P.colRouleCouleur, ["homme", "col-roule", "grosse-maille", "hiver"], "70% laine, 30% alpaga"],
+  ["col-roule-leger", "Col roulé Léger", "Femme · Mérinos", 79, "colRoule", P.colRoule, ["femme", "col-roule", "mi-saison"], "100% laine mérinos"],
+  ["col-roule-oversize", "Col roulé Oversize", "Femme · Laine", 99, "colRoule", P.colRouleCouleur, ["femme", "col-roule", "oversize", "hiver"], "70% laine, 30% mohair", { oldPrice: 125, badge: "-21%" }],
+  ["col-roule-grandes-tailles", "Col roulé Confort", "Homme · Laine", 95, "colRoule", P.colRoule, ["homme", "col-roule", "grandes-tailles", "hiver"], "80% laine, 20% alpaga", { sizes: ["L", "XL", "XXL"] }],
+  ["col-roule-enfant", "Col roulé enfant", "Enfant · Laine", 45, "colRoule", P.colRouleCouleur, ["enfant", "col-roule", "hiver", "petits-prix"], "100% laine douce", { sizes: ["XS", "S", "M"] }],
+  ["col-roule-eco", "Col roulé Éco", "Mixte · Laine recyclée", 85, "colRoule", P.colRoule, ["femme", "homme", "col-roule", "eco-responsable", "tons-neutres"], "100% laine recyclée", { badge: "Éco" }],
+  ["col-roule-chine-promo", "Col roulé chiné Promo", "Mixte · Laine", 69, "colRoule", P.colRoule, ["femme", "homme", "col-roule", "promotions", "grosse-maille"], "70% laine, 30% alpaga", { oldPrice: 99, badge: "-30%" }],
+];
+
+const DESC: Record<Product["garment"], string> = {
+  blanc: "Maille douce et régulière, col rond côtelé, bas et poignets bord-côte. Une coupe droite et confortable, facile à porter tous les jours.",
+  colV: "Tricot côtelé souple et grand col V, épaules légèrement tombantes. Se porte aussi bien sur un t-shirt que sur une chemise.",
+  colRoule: "Col roulé généreux et maille chaude, bords côtes. Un indispensable de la saison froide, sobre et élégant.",
+};
+
+export const demoProducts2: Product[] = SPECS.map(([id, name, category, price, garment, palette, tags, material, extra]) => ({
+  id,
+  name,
+  category,
+  tagline: material,
+  description: DESC[garment],
+  material,
+  price,
+  tags,
+  garment,
+  variants: structuredClone(palette),
+  sizes: ["XS", "S", "M", "L", "XL"],
+  ...extra,
+}));
+
+/** Codes promo d'exemple (dates relatives à aujourd'hui) */
+export function demoPromos(today: string) {
+  const add = (n: number) => {
+    const d = new Date(`${today}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + n);
+    return d.toISOString().slice(0, 10);
+  };
+  const now = new Date().toISOString();
+  return [
+    { code: "BIENVENUE10", type: "percent", value: 10, startsAt: add(-30), endsAt: add(335), uses: 0, active: true, createdAt: now },
+    { code: "LAINE15", type: "fixed", value: 15, startsAt: add(-5), endsAt: add(25), minSubtotal: 120, uses: 0, active: true, createdAt: now },
+    { code: "HIVER20", type: "percent", value: 20, startsAt: add(10), endsAt: add(40), uses: 0, active: true, createdAt: now },
+    { code: "ETE2026", type: "percent", value: 15, startsAt: add(-150), endsAt: add(-60), uses: 0, active: true, createdAt: now },
+    { code: "VIP50", type: "fixed", value: 50, startsAt: add(-10), endsAt: add(50), minSubtotal: 250, maxUses: 20, uses: 0, active: true, createdAt: now },
+  ] as const;
+}

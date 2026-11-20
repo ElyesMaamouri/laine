@@ -8,7 +8,7 @@ import ProductCard from "./ProductCard";
 const PAGE = 6;
 
 /** Collection filtrée sur place (sans changer de page), avec animation */
-export default function CollectionFilter() {
+export default function CollectionFilter({ title = "La collection pulls" }: { title?: string }) {
   const { products, categories } = useCatalog();
   const [active, setActive] = useState<string | null>(null);
   const [shown, setShown] = useState(PAGE);
@@ -43,7 +43,7 @@ export default function CollectionFilter() {
   return (
     <>
       <div className="mb-6 flex items-end justify-between">
-        <h2 className="font-display text-3xl">La collection pulls</h2>
+        <h2 className="font-display text-3xl">{title}</h2>
         <p key={active ?? "tout"} className="animate-fade-up text-sm text-muted">
           {list.length} modèle{list.length > 1 ? "s" : ""} · {cards.length} coloris
         </p>

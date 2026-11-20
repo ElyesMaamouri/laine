@@ -6,6 +6,7 @@ import AdminShell, { useAdmin } from "@/components/admin/AdminShell";
 import ProductImage from "@/components/ProductImage";
 import { deleteProduct } from "../actions";
 import { formatPrice } from "@/lib/products";
+import Pagination, { usePaged } from "@/components/Pagination";
 
 export default function Page() {
   return (
@@ -26,10 +27,12 @@ function ProductList() {
   const { data, reload } = useAdmin();
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  if (!data) return null;
-  const { products, categories } = data.catalog;
-  const catName = (s: string) => categories.find((c) => c.slug === s)?.name ?? s;
+  const products = data?.catalog.products ?? [];
+  const categories = data?.catalog.categories ?? [];
   const list = products.filter((p) => p.name.toLowerCase().includes(q.toLowerCase()));
+  const paged = usePaged(list, 15, q);
+  if (!data) return null;
+  const catName = (s: string) => categories.find((c) => c.slug === s)?.name ?? s;
 
   const remove = async (id: string, name: string) => {
     if (!confirm(`Supprimer « ${name} » ? Il disparaîtra de la boutique.`)) return;
@@ -59,7 +62,7 @@ function ProductList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
-            {list.map((p) => (
+            {paged.items.map((p) => (
               <tr key={p.id} className={busy === p.id ? "opacity-40" : ""}>
                 <td className="p-4">
                   <div className="flex items-center gap-3">
@@ -98,6 +101,7 @@ function ProductList() {
           </tbody>
         </table>
       </div>
+      <Pagination page={paged.page} pages={paged.pages} onChange={paged.setPage} total={paged.total} perPage={15} />
     </div>
   );
 }
