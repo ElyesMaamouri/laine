@@ -78,14 +78,27 @@ function sameText(a: string, b: string) {
   return timingSafeEqual(ha, hb);
 }
 
+/** valeur d'environnement nettoyée (espaces et guillemets collés par erreur dans Vercel) */
+const envValue = (v: string | undefined) => v?.trim().replace(/^["']|["']$/g, "").trim() || undefined;
+
+/** Ce qui manque pour que l'admin fonctionne (vide = tout est configuré) */
+export function adminConfigProblems() {
+  const missing: string[] = [];
+  if (!envValue(process.env.ADMIN_EMAIL)) missing.push("ADMIN_EMAIL");
+  if (!envValue(process.env.ADMIN_PASSWORD)) missing.push("ADMIN_PASSWORD");
+  // en ligne, sans secret fixe, chaque serveur signe les sessions avec une clé différente
+  if (process.env.NODE_ENV === "production" && (process.env.AUTH_SECRET ?? "").length < 32) missing.push("AUTH_SECRET");
+  return missing;
+}
+
 /** Vérifie les identifiants admin (comparaison à temps constant) */
 export function checkAdminCredentials(email: string, password: string) {
-  const e = process.env.ADMIN_EMAIL;
-  const p = process.env.ADMIN_PASSWORD;
+  const e = envValue(process.env.ADMIN_EMAIL);
+  const p = envValue(process.env.ADMIN_PASSWORD);
   if (!e || !p) return false;
   // les deux comparaisons sont toujours faites
   const okEmail = sameText(email.trim().toLowerCase(), e.toLowerCase());
-  const okPass = sameText(password, p);
+  const okPass = sameText(password.trim(), p);
   return okEmail && okPass;
 }
 

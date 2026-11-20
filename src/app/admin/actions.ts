@@ -5,7 +5,7 @@
  */
 import { updateTag } from "next/cache";
 import { read, write, ORDER_STATUSES, type Order, type OrderStatus } from "@/lib/server/db";
-import { checkAdminCredentials, endAdminSession, isAdmin, startAdminSession } from "@/lib/server/auth";
+import { adminConfigProblems, checkAdminCredentials, endAdminSession, isAdmin, startAdminSession } from "@/lib/server/auth";
 import { CATALOG_TAG } from "@/lib/server/catalog";
 import { garments, type GarmentId } from "@/lib/garments";
 import type { Product, Variant } from "@/lib/products";
@@ -53,6 +53,12 @@ export async function slugify(s: string) {
 export async function adminLogin(email: string, password: string): Promise<Result> {
   // petite pause pour ralentir les essais en série
   await new Promise((r) => setTimeout(r, 400));
+  const missing = adminConfigProblems();
+  if (missing.length)
+    return {
+      ok: false,
+      error: `Admin non configuré sur le serveur : variable(s) ${missing.join(", ")} manquante(s). Ajoutez-les dans Vercel (Settings → Environment Variables) puis redéployez.`,
+    };
   if (!checkAdminCredentials(String(email), String(password))) return { ok: false, error: "Identifiants incorrects." };
   await startAdminSession();
   return { ok: true };
