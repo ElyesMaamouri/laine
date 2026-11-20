@@ -120,6 +120,8 @@ export async function saveProduct(input: Product, originalId: string | null): Pr
   if (sizes.length === 0) return { ok: false, error: "Choisissez au moins une taille." };
 
   const photos = (input.photos ?? []).map(upload).filter((u): u is string => !!u).slice(0, 8);
+  if (photos.length !== Math.min(8, (input.photos ?? []).length) || (input.variants ?? []).some((v) => v.photo && !upload(v.photo)))
+    return { ok: false, error: "Une image a été refusée (adresse inattendue). Renvoyez-la puis réessayez." };
   const before = await read((d) => usedUploads(d.catalog));
 
   const result = await write((d) => {
@@ -186,6 +188,7 @@ export async function saveCategory(input: Category, originalSlug: string | null)
   const slug = (await slugify(String(input.slug || name))) || "categorie";
   const description = String(input.description ?? "").trim().slice(0, 200);
   const image = upload(input.image);
+  if (input.image && !image) return { ok: false, error: "Image refusée : adresse inattendue. Renvoyez l'image puis réessayez." };
   const before = await read((d) => usedUploads(d.catalog));
 
   const res = await write((d) => {

@@ -1,5 +1,5 @@
 import { isAdmin } from "@/lib/server/auth";
-import { detectImage, MAX_UPLOAD, saveUpload } from "@/lib/server/uploads";
+import { cloudinaryMissing, detectImage, hasCloudinary, MAX_UPLOAD, onReadOnlyHost, saveUpload } from "@/lib/server/uploads";
 
 /** Upload d'une image (admin uniquement) : JPG, PNG ou WebP, 4 Mo max */
 export async function POST(req: Request) {
@@ -14,10 +14,20 @@ export async function POST(req: Request) {
   const ext = detectImage(buf);
   if (!ext) return Response.json({ error: "Format non pris en charge (JPG, PNG ou WebP)." }, { status: 415 });
 
+  // en ligne sans Cloudinary : on le dit clairement plutôt que d'échouer sur le disque
+  if (onReadOnlyHost() && !hasCloudinary()) {
+    return Response.json(
+      { error: `Cloudinary non configuré sur Vercel. Variable(s) manquante(s) : ${cloudinaryMissing().join(", ")}. Ajoutez-les puis redéployez.` },
+      { status: 503 },
+    );
+  }
+
   try {
     return Response.json({ url: await saveUpload(buf, ext) });
   } catch (e) {
     console.warn("[upload]", e);
-    return Response.json({ error: "Échec de l'enregistrement de l'image." }, { status: 502 });
+    const detail = e instanceof Error ? e.message : String(e);
+    // message réservé à l'admin connecté : la cause exacte aide à corriger la configuration
+    return Response.json({ error: `Échec de l'enregistrement de l'image — ${detail.slice(0, 200)}` }, { status: 502 });
   }
 }

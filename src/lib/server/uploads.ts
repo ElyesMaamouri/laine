@@ -19,12 +19,31 @@ export type Ext = keyof typeof TYPES;
 
 /* ---------------- Cloudinary ---------------- */
 
+/** valeur nettoyée : espaces, guillemets ou « NOM= » collés par erreur dans Vercel */
+const clean = (v: string | undefined, name: string) =>
+  v?.trim().replace(new RegExp(`^${name}=`), "").replace(/^["']|["']$/g, "").trim() || undefined;
+
 function cloudinary() {
-  const u = process.env.CLOUDINARY_URL?.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
-  if (u) return { key: u[1], secret: u[2], cloud: u[3] };
-  const { CLOUDINARY_CLOUD_NAME: cloud, CLOUDINARY_API_KEY: key, CLOUDINARY_API_SECRET: secret } = process.env;
+  const url = clean(process.env.CLOUDINARY_URL, "CLOUDINARY_URL");
+  const u = url?.match(/^cloudinary:\/\/([^:]+):([^@]+)@(.+)$/);
+  if (u) return { key: u[1], secret: u[2], cloud: u[3].toLowerCase() };
+  const cloud = clean(process.env.CLOUDINARY_CLOUD_NAME, "CLOUDINARY_CLOUD_NAME")?.toLowerCase();
+  const key = clean(process.env.CLOUDINARY_API_KEY, "CLOUDINARY_API_KEY");
+  const secret = clean(process.env.CLOUDINARY_API_SECRET, "CLOUDINARY_API_SECRET");
   return cloud && key && secret ? { cloud, key, secret } : null;
 }
+
+/** Variables Cloudinary présentes mais incomplètes (pour un message clair) */
+export function cloudinaryMissing() {
+  if (cloudinary()) return [];
+  if (clean(process.env.CLOUDINARY_URL, "CLOUDINARY_URL")) return ["CLOUDINARY_URL (format attendu : cloudinary://clé:secret@cloud)"];
+  return ["CLOUDINARY_CLOUD_NAME", "CLOUDINARY_API_KEY", "CLOUDINARY_API_SECRET"].filter(
+    (n) => !clean(process.env[n], n),
+  );
+}
+
+/** Sur Vercel, le disque est en lecture seule : Cloudinary est obligatoire */
+export const onReadOnlyHost = () => !!process.env.VERCEL;
 export const hasCloudinary = () => !!cloudinary();
 
 /** Signature Cloudinary : sha1 des paramètres triés + secret */
