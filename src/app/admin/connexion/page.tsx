@@ -16,7 +16,20 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const r = await adminLogin(email, password);
+    let r: Awaited<ReturnType<typeof adminLogin>>;
+    try {
+      r = await adminLogin(email, password);
+    } catch (err) {
+      setBusy(false);
+      // page ouverte avant un redéploiement : l'ancienne action n'existe plus côté serveur
+      if (/server action|failed to find|deployment/i.test(String(err))) {
+        setError("Le site vient d'être mis à jour : rechargement de la page…");
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        setError("Le serveur ne répond pas, réessayez dans un instant.");
+      }
+      return;
+    }
     setBusy(false);
     if (!r.ok) return setError(r.error);
     const next = new URLSearchParams(window.location.search).get("suite");
