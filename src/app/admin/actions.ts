@@ -4,7 +4,7 @@
  * Chaque action vérifie la session admin, puis rafraîchit la boutique (updateTag) après modification.
  */
 import { updateTag } from "next/cache";
-import { read, write, ORDER_STATUSES, type Order, type OrderStatus } from "@/lib/server/db";
+import { read, write, ORDER_STATUSES, type Order, type OrderStatus, type Review } from "@/lib/server/db";
 import { adminConfigProblems, checkAdminCredentials, endAdminSession, isAdmin, startAdminSession } from "@/lib/server/auth";
 import { CATALOG_TAG } from "@/lib/server/catalog";
 import { garments, type GarmentId } from "@/lib/garments";
@@ -12,6 +12,7 @@ import type { Product, Variant } from "@/lib/products";
 import type { Catalog, Category } from "@/lib/categories";
 import { checkPromoInput, type PromoCode } from "@/lib/promos";
 import type { HomeSection } from "@/lib/home";
+import type { StoreSettings } from "@/lib/settings";
 import { isUploadUrl, removeUpload } from "@/lib/server/uploads";
 
 type Result = { ok: true } | { ok: false; error: string };
@@ -80,9 +81,9 @@ export async function adminCheck() {
 
 /* ---------------- lecture ---------------- */
 
-export async function getAdminData(): Promise<{ catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[] }> {
+export async function getAdminData(): Promise<{ catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[]; settings: StoreSettings; reviews: Review[] }> {
   await guard();
-  return read((d) => ({ catalog: d.catalog, orders: [...d.orders].reverse(), promos: d.promos, home: d.home }));
+  return read((d) => ({ catalog: d.catalog, orders: [...d.orders].reverse(), promos: d.promos, home: d.home, settings: d.settings, reviews: [...d.reviews].reverse() }));
 }
 
 /* ---------------- produits ---------------- */
@@ -306,7 +307,10 @@ export async function setOrderStatus(id: string, status: OrderStatus): Promise<R
   if (!ORDER_STATUSES.includes(status)) return { ok: false, error: "Statut invalide." };
   const found = await write((d) => {
     const o = d.orders.find((x) => x.id === id);
-    if (o) o.status = status;
+    if (o && o.status !== status) {
+      o.status = status;
+      o.history = [...(o.history ?? [{ status: "nouvelle", at: o.createdAt }]), { status, at: new Date().toISOString() }];
+    }
     return !!o;
   });
   return found ? { ok: true } : { ok: false, error: "Commande introuvable." };
@@ -390,5 +394,45 @@ export async function resetHome(): Promise<Result> {
   });
   await cleanUploads(before);
   updateTag(CATALOG_TAG);
+  return { ok: true };
+}
+
+/* ---------------- paramètres de la boutique ---------------- */
+
+export async function saveSettings(input: StoreSettings): Promise<Result> {
+  await guard();
+  const { CURRENCIES } = await import("@/lib/settings");
+  if (!(input.currency in CURRENCIES)) return { ok: false, error: "Devise invalide." };
+  const whatsapp = String(input.whatsapp ?? "").replace(/\D/g, "");
+  if (whatsapp && (whatsapp.length < 8 || whatsapp.length > 15)) return { ok: false, error: "Numéro WhatsApp invalide : indicatif pays + numéro, ex. 21612345678." };
+  const fee = Number(input.shippingFee);
+  const free = Number(input.freeShippingAbove);
+  if (!(fee >= 0 && fee < 10000)) return { ok: false, error: "Frais de livraison invalides." };
+  if (!(free >= 0 && free < 100000)) return { ok: false, error: "Seuil de livraison offerte invalide." };
+  await write((d) => {
+    d.settings = { currency: input.currency, whatsapp, shippingFee: Math.round(fee * 100) / 100, freeShippingAbove: Math.round(free * 100) / 100 };
+  });
+  updateTag(CATALOG_TAG);
+  return { ok: true };
+}
+
+/* ---------------- avis clients ---------------- */
+
+export async function moderateReview(id: string, status: Review["status"]): Promise<Result> {
+  await guard();
+  if (!["en attente", "publié", "refusé"].includes(status)) return { ok: false, error: "Statut invalide." };
+  const found = await write((d) => {
+    const r = d.reviews.find((x) => x.id === id);
+    if (r) r.status = status;
+    return !!r;
+  });
+  return found ? { ok: true } : { ok: false, error: "Avis introuvable." };
+}
+
+export async function deleteReview(id: string): Promise<Result> {
+  await guard();
+  await write((d) => {
+    d.reviews = d.reviews.filter((r) => r.id !== id);
+  });
   return { ok: true };
 }

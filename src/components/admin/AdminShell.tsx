@@ -5,11 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { adminCheck, adminLogout, getAdminData } from "@/app/admin/actions";
 import type { Catalog } from "@/lib/categories";
-import type { Order } from "@/lib/server/db";
+import type { Order, Review } from "@/lib/server/db";
 import type { PromoCode } from "@/lib/promos";
 import type { HomeSection } from "@/lib/home";
+import { applySettings, type StoreSettings } from "@/lib/settings";
 
-type AdminData = { catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[] };
+type AdminData = { catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[]; settings: StoreSettings; reviews: Review[] };
 const Ctx = createContext<{ data: AdminData | null; reload: () => Promise<void> }>({ data: null, reload: async () => {} });
 export const useAdmin = () => useContext(Ctx);
 
@@ -20,6 +21,8 @@ const NAV = [
   ["/admin/commandes", "Commandes", "☰"],
   ["/admin/promos", "Codes promo", "%"],
   ["/admin/accueil", "Page d'accueil", "⌂"],
+  ["/admin/avis", "Avis clients", "★"],
+  ["/admin/parametres", "Paramètres", "⚙"],
 ] as const;
 
 /** Cadre du tableau de bord : vérifie la session admin, charge les données, affiche le menu */
@@ -32,7 +35,9 @@ export default function AdminShell({ title, action, children }: { title: string;
 
   const reload = useCallback(async () => {
     try {
-      setData(await getAdminData());
+      const d = await getAdminData();
+      applySettings(d.settings); // devise à jour dans l'admin juste après un changement
+      setData(d);
     } catch {
       router.replace("/admin/connexion");
     }
@@ -67,6 +72,7 @@ export default function AdminShell({ title, action, children }: { title: string;
     );
 
   const newOrders = data?.orders.filter((o) => o.status === "nouvelle").length ?? 0;
+  const pendingReviews = data?.reviews.filter((r) => r.status === "en attente").length ?? 0;
 
   return (
     <Ctx.Provider value={{ data, reload }}>
@@ -113,6 +119,7 @@ export default function AdminShell({ title, action, children }: { title: string;
                   >
                     <span aria-hidden>{icon}</span>
                     <span className="flex-1">{label}</span>
+                    {href === "/admin/avis" && pendingReviews > 0 && <span className="rounded-full bg-clay px-2 text-xs">{pendingReviews}</span>}
                     {href === "/admin/commandes" && newOrders > 0 && (
                       <span className="rounded-full bg-clay px-2 text-xs">{newOrders}</span>
                     )}

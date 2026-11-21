@@ -1,7 +1,7 @@
 import { formatPrice } from "@/lib/products";
-import { FREE_SHIPPING_ABOVE, missingForFreeShipping, SHIPPING_FEE } from "@/lib/pricing";
+import { freeShippingAbove, missingForFreeShipping, shippingFee } from "@/lib/pricing";
 
-/** Sous-total, remise éventuelle, livraison (20 €, offerte au-delà de 200 €) et total, avec barre de progression */
+/** Sous-total, remise éventuelle, livraison (selon les Paramètres de la boutique) et total, avec barre de progression */
 export default function Totals({
   subtotal,
   shipping,
@@ -17,10 +17,11 @@ export default function Totals({
 }) {
   const base = subtotal - discount; // la livraison offerte se calcule après remise
   const missing = missingForFreeShipping(base);
-  const pct = Math.min(100, (base / FREE_SHIPPING_ABOVE) * 100);
+  const free = freeShippingAbove();
+  const pct = Math.min(100, (base / (free || 1)) * 100);
   return (
     <div className="space-y-2 text-sm">
-      {subtotal > 0 && (
+      {subtotal > 0 && free > 0 && (
         <div className="mb-4 rounded-lg bg-mist p-3">
           <p className="text-xs">
             {missing > 0 ? (
@@ -55,7 +56,8 @@ export default function Totals({
         <span>{formatPrice(total)}</span>
       </div>
       <p className="text-xs text-muted">
-        Livraison {formatPrice(SHIPPING_FEE)}, offerte au-delà de {formatPrice(FREE_SHIPPING_ABOVE)}. Paiement à la livraison.
+        Livraison {formatPrice(shippingFee())}
+        {free > 0 ? `, offerte au-delà de ${formatPrice(free)}` : ""}. Paiement à la livraison.
       </p>
     </div>
   );

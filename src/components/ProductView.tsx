@@ -6,9 +6,14 @@ import { useEffect, useState } from "react";
 import { formatPrice, type Product } from "@/lib/products";
 import ProductImage from "./ProductImage";
 import ExpressOrder from "./ExpressOrder";
-import { FREE_SHIPPING_ABOVE, SHIPPING_FEE } from "@/lib/pricing";
+import { freeShippingAbove, shippingFee } from "@/lib/pricing";
 import { useCart } from "./CartProvider";
-import { CameraIcon, HeartIcon } from "./Icons";
+import { CameraIcon } from "./Icons";
+import { FavButton } from "./Favorites";
+import ProductReviews from "./ProductReviews";
+import { WhatsAppIcon } from "./OrderDetail";
+import { useCatalog } from "./CatalogProvider";
+import { whatsappLink } from "@/lib/settings";
 
 const TryOnModal = dynamic(() => import("./TryOnModal"), { ssr: false });
 
@@ -18,6 +23,7 @@ export default function ProductView({ product }: { product: Product }) {
   const [sizeError, setSizeError] = useState(false);
   const [tryOn, setTryOn] = useState(false);
   const { add } = useCart();
+  const { settings } = useCatalog();
   const v = product.variants.find((x) => x.id === variantId) ?? product.variants[0];
 
   useEffect(() => {
@@ -150,13 +156,29 @@ export default function ProductView({ product }: { product: Product }) {
             <button onClick={addToCart} className="h-12 flex-1 rounded-full bg-ink text-sm font-medium text-paper hover:bg-black">
               Ajouter au panier
             </button>
-            <button className="grid h-12 w-12 place-items-center rounded-full border border-line bg-white" aria-label="Ajouter aux favoris">
-              <HeartIcon />
-            </button>
+            <FavButton productId={product.id} variantId={v.id} name={product.name} className="grid h-12 w-12 place-items-center rounded-full border border-line bg-white hover:border-ink" />
           </div>
           <a href="#commande-express" className="mt-3 block text-center text-sm underline underline-offset-4">
             Acheter sans panier → commande express
           </a>
+          {settings.whatsapp && (
+            <button
+              type="button"
+              onClick={() => {
+                const msg = `Bonjour, je souhaite commander :
+• ${product.name}
+• Couleur : ${v.name}
+• Taille : ${size ?? "à préciser"}
+• Prix : ${formatPrice(product.price)}
+${window.location.origin}/produit/${product.id}?couleur=${v.id}`;
+                const link = whatsappLink(msg);
+                if (link) window.open(link, "_blank", "noopener");
+              }}
+              className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#1f8f4e] text-sm font-medium text-white hover:brightness-95"
+            >
+              <WhatsAppIcon className="h-5 w-5" /> Commander via WhatsApp
+            </button>
+          )}
 
           <ExpressOrder product={product} variant={v} size={size} onMissingSize={() => setSizeError(true)} />
 
@@ -164,11 +186,14 @@ export default function ProductView({ product }: { product: Product }) {
             <p>{product.description}</p>
             <p className="text-muted">Composition : {product.material}</p>
             <p className="text-muted">
-              Livraison {formatPrice(SHIPPING_FEE)}, offerte au-delà de {formatPrice(FREE_SHIPPING_ABOVE)} · Paiement à la livraison
+              Livraison {formatPrice(shippingFee())}
+              {freeShippingAbove() > 0 ? `, offerte au-delà de ${formatPrice(freeShippingAbove())}` : ""} · Paiement à la livraison
             </p>
           </div>
         </div>
       </div>
+
+      <ProductReviews productId={product.id} />
 
       {tryOn && <TryOnModal product={product} variantId={v.id} onVariant={setVariantId} onClose={() => setTryOn(false)} />}
     </div>

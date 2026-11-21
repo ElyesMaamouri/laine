@@ -2,20 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import Totals from "./Totals";
-import { formatPrice } from "@/lib/products";
-
-type Order = {
-  number: string;
-  createdAt: string;
-  customer: { name: string; email: string; phone: string; address: string; city: string; zip: string };
-  items: { productId: string; variantId: string; name: string; variant: string; size: string; qty: number; lineTotal: number }[];
-  subtotal: number;
-  discount?: number;
-  promoCode?: string;
-  shipping: number;
-  total: number;
-};
+import OrderDetail, { type PublicOrder as Order } from "./OrderDetail";
 
 export default function ConfirmationView() {
   const [order, setOrder] = useState<Order | null>(null);
@@ -54,26 +41,16 @@ export default function ConfirmationView() {
         </p>
       </div>
 
-      <div className="mt-10 rounded-2xl border border-line bg-white p-6">
-        <ul className="mb-5 space-y-2 text-sm">
-          {order.items.map((i) => (
-            <li key={`${i.productId}-${i.variantId}-${i.size}`} className="flex justify-between gap-3">
-              <span>
-                {i.qty} × {i.name} <span className="text-muted">· {i.variant} · {i.size}</span>
-              </span>
-              <span>{formatPrice(i.lineTotal)}</span>
-            </li>
-          ))}
-        </ul>
-        <Totals subtotal={order.subtotal} discount={order.discount} promoCode={order.promoCode} shipping={order.shipping} total={order.total} />
-        <div className="mt-6 border-t border-line pt-4 text-sm">
-          <p className="font-medium">Livraison</p>
-          <p className="text-muted">
-            {order.customer.address}, {order.customer.zip} {order.customer.city}
-          </p>
-          <p className="mt-2 text-muted">Paiement à la livraison</p>
-        </div>
+      <div className="mt-10">
+        <OrderDetail order={order} />
       </div>
+      <p className="mt-6 text-center text-sm text-muted">
+        Retrouvez cette commande à tout moment sur{" "}
+        <Link href="/suivi" className="text-ink underline underline-offset-4">
+          Suivre ma commande
+        </Link>{" "}
+        avec son numéro et votre e-mail.
+      </p>
 
       <div className="mt-8 text-center">
         <Link href="/#collection" className="inline-flex h-12 items-center rounded-full bg-ink px-6 text-sm font-medium text-paper">

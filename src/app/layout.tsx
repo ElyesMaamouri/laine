@@ -3,12 +3,14 @@ import { Fraunces, Geist } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/components/CartProvider";
 import { AuthProvider } from "@/components/AuthProvider";
+import { FavoritesProvider } from "@/components/Favorites";
 import Header from "@/components/Header";
 import Link from "next/link";
-import { getCatalog } from "@/lib/server/catalog";
+import { getCatalog, getSettings } from "@/lib/server/catalog";
+import { applySettings } from "@/lib/settings";
 import { CatalogProvider } from "@/components/CatalogProvider";
 import { formatPrice } from "@/lib/products";
-import { FREE_SHIPPING_ABOVE, SHIPPING_FEE } from "@/lib/pricing";
+import { freeShippingAbove, shippingFee } from "@/lib/pricing";
 
 const body = Geist({ variable: "--font-body", subsets: ["latin"] });
 const display = Fraunces({ variable: "--font-display", subsets: ["latin"] });
@@ -19,16 +21,18 @@ export const metadata: Metadata = {
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
-  const catalog = await getCatalog();
+  const [catalog, settings] = await Promise.all([getCatalog(), getSettings()]);
+  applySettings(settings);
   const { categories } = catalog;
   return (
     // data-scroll-behavior : Next garde le défilement fluide sans l'appliquer aux changements de page
     <html lang="fr" data-scroll-behavior="smooth" className={`${body.variable} ${display.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        <CatalogProvider catalog={catalog}>
+        <CatalogProvider catalog={catalog} settings={settings}>
         <AuthProvider>
+        <FavoritesProvider>
         <CartProvider>
-          <div className="shop-chrome">
+          <div className="shop-chrome contents">
             <Header />
           </div>
           <main className="flex-1">{children}</main>
@@ -57,12 +61,14 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                   <li><Link href="/inscription" className="hover:text-ink">Créer un compte</Link></li>
                   <li><Link href="/compte" className="hover:text-ink">Mes commandes</Link></li>
                   <li><Link href="/panier" className="hover:text-ink">Panier</Link></li>
+                  <li><Link href="/suivi" className="hover:text-ink">Suivre ma commande</Link></li>
+                  <li><Link href="/favoris" className="hover:text-ink">Mes favoris</Link></li>
                 </ul>
               </div>
               <div>
                 <p className="mb-3 font-medium">Infos</p>
                 <ul className="space-y-2 text-muted">
-                  <li>Livraison {formatPrice(SHIPPING_FEE)}, offerte au-delà de {formatPrice(FREE_SHIPPING_ABOVE)}</li>
+                  <li>Livraison {formatPrice(shippingFee())}, offerte au-delà de {formatPrice(freeShippingAbove())}</li>
                   <li>Paiement à la livraison</li>
                   <li><Link href="/#faq" className="hover:text-ink">Questions fréquentes</Link></li>
                 </ul>
@@ -73,6 +79,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
             </div>
           </footer>
         </CartProvider>
+        </FavoritesProvider>
         </AuthProvider>
         </CatalogProvider>
       </body>

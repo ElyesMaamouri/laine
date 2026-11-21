@@ -1,6 +1,7 @@
 import Link from "next/link";
 import ProductImage from "./ProductImage";
 import { CameraIcon } from "./Icons";
+import { FavButton } from "./Favorites";
 import { formatPrice, type Product, type Variant } from "@/lib/products";
 
 export default function ProductCard({ p, v }: { p: Product; v: Variant }) {
@@ -11,6 +12,7 @@ export default function ProductCard({ p, v }: { p: Product; v: Variant }) {
           <ProductImage p={p} v={v} width={600} height={750} />
         </div>
         {p.badge && <span className="absolute left-3 top-3 rounded-full bg-white px-2.5 py-1 text-[11px] font-medium">{p.badge}</span>}
+        <FavButton productId={p.id} variantId={v.id} name={p.name} overlay className="absolute right-3 top-3" />
         <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-ink/85 px-3 py-1.5 text-[11px] text-paper opacity-0 transition-opacity group-hover:opacity-100 max-md:opacity-100">
           <CameraIcon className="h-3.5 w-3.5" /> Essayer
         </span>

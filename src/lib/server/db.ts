@@ -12,6 +12,7 @@ import { seedCategories, type Catalog } from "../categories";
 import { hasRedis, redis } from "./redis";
 import type { PromoCode } from "../promos";
 import { withDefaults, type HomeSection } from "../home";
+import { applySettings, defaultSettings, type StoreSettings } from "../settings";
 
 export type User = { id: string; name: string; email: string; passwordHash: string; createdAt: string };
 
@@ -42,14 +43,29 @@ export type Order = {
   total: number;
   payment: "cod";
   status: OrderStatus;
+  /** dates de chaque changement de statut (suivi client) */
+  history?: { status: OrderStatus; at: string }[];
   source: "checkout" | "express";
+  createdAt: string;
+};
+
+/** Avis client : publié seulement après validation dans l'admin */
+export type Review = {
+  id: string;
+  productId: string;
+  userId: string;
+  /** prénom + initiale, ex : « Camille D. » */
+  author: string;
+  rating: number; // 1 à 5
+  text: string;
+  status: "en attente" | "publié" | "refusé";
   createdAt: string;
 };
 
 export const ORDER_STATUSES = ["nouvelle", "confirmée", "expédiée", "livrée", "annulée"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
-export type Data = { users: User[]; orders: Order[]; catalog: Catalog; promos: PromoCode[]; home: HomeSection[] };
+export type Data = { users: User[]; orders: Order[]; catalog: Catalog; promos: PromoCode[]; home: HomeSection[]; settings: StoreSettings; reviews: Review[] };
 
 const FILE = path.join(process.cwd(), "data", "db.json");
 let queue: Promise<unknown> = Promise.resolve();
@@ -57,6 +73,13 @@ let queue: Promise<unknown> = Promise.resolve();
 const seedCatalog = (): Catalog => structuredClone({ products: seedProducts, categories: seedCategories });
 
 export const REDIS_KEY = "laine:db";
+
+/** Les réglages (devise, livraison…) s'appliquent dès que la base est lue */
+function applyAndReturn(s: Partial<StoreSettings> | undefined): StoreSettings {
+  const full = { ...defaultSettings, ...(s ?? {}) };
+  applySettings(full);
+  return full;
+}
 
 async function load(): Promise<Data> {
   let d: Partial<Data> = {};
@@ -74,6 +97,8 @@ async function load(): Promise<Data> {
     catalog: d.catalog ?? seedCatalog(),
     promos: d.promos ?? [],
     home: withDefaults(d.home),
+    settings: applyAndReturn(d.settings),
+    reviews: d.reviews ?? [],
   };
 }
 

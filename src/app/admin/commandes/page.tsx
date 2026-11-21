@@ -7,6 +7,8 @@ import { setOrderStatus } from "../actions";
 import { formatPrice } from "@/lib/products";
 import type { OrderStatus } from "@/lib/server/db";
 import Pagination, { usePaged } from "@/components/Pagination";
+import { WhatsAppIcon } from "@/components/OrderDetail";
+import { toInternational } from "@/lib/settings";
 
 const STATUSES: OrderStatus[] = ["nouvelle", "confirmée", "expédiée", "livrée", "annulée"];
 
@@ -128,6 +130,14 @@ function Orders() {
                             <a href={`tel:${o.customer.phone}`} className="underline">{o.customer.phone}</a> ·{" "}
                             <a href={`mailto:${o.customer.email}`} className="underline">{o.customer.email}</a>
                           </p>
+                          <a
+                            href={`https://wa.me/${toInternational(o.customer.phone)}?text=${encodeURIComponent(`Bonjour ${o.customer.name.split(" ")[0]}, c'est la boutique Lainé au sujet de votre commande ${o.number} (${formatPrice(o.total)}).`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#1f8f4e] px-4 py-2 text-xs font-medium text-white hover:brightness-95"
+                          >
+                            <WhatsAppIcon /> Contacter sur WhatsApp
+                          </a>
                           {o.customer.note && <p className="mt-2 text-muted">Note : {o.customer.note}</p>}
                           <p className="mt-2 text-xs text-muted">Paiement à la livraison · {o.userId ? "client avec compte" : "sans compte"}</p>
                         </div>

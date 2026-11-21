@@ -1,3 +1,5 @@
+import { formatPrice } from "./products";
+
 /**
  * Codes promo : modèle et règles de validation (utilisé côté serveur, qui fait foi).
  * Dates au format AAAA-MM-JJ, comparées en heure de Paris, bornes incluses.
@@ -63,11 +65,11 @@ export function applyPromo(p: PromoCode | undefined | null, subtotal: number, to
       return { discount: 0, error: `Ce code a expiré le ${fr(p.endsAt)}.` };
   }
   if (p.minSubtotal && subtotal < p.minSubtotal) {
-    return { discount: 0, error: `Ce code s'applique dès ${p.minSubtotal.toFixed(2).replace(".", ",")} € d'achat.` };
+    return { discount: 0, error: `Ce code s'applique dès ${formatPrice(p.minSubtotal)} d'achat.` };
   }
   const raw = p.type === "percent" ? (subtotal * p.value) / 100 : p.value;
   return { discount: Math.round(Math.min(raw, subtotal) * 100) / 100 };
 }
 
 export const promoLabel = (p: Pick<PromoCode, "type" | "value">) =>
-  p.type === "percent" ? `-${p.value} %` : `-${p.value.toFixed(2).replace(".", ",")} €`;
+  p.type === "percent" ? `-${p.value} %` : `-${formatPrice(p.value)}`;

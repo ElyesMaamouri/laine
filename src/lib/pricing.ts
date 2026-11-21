@@ -1,16 +1,19 @@
 import type { Product } from "./products";
 import { applyPromo, type PromoCode } from "./promos";
 
-/** Frais de livraison fixes */
-export const SHIPPING_FEE = 20;
-/** Livraison offerte quand le montant (après remise) DÉPASSE ce montant */
-export const FREE_SHIPPING_ABOVE = 200;
+import { storeSettings } from "./settings";
+
+/** Frais de livraison (Paramètres de la boutique) */
+export const shippingFee = () => storeSettings().shippingFee;
+/** Livraison offerte quand le montant (après remise) DÉPASSE ce seuil ; 0 = jamais */
+export const freeShippingAbove = () => storeSettings().freeShippingAbove;
 
 export type LineInput = { productId: string; variantId: string; size: string; qty: number };
 
 export function shippingFor(amount: number) {
   if (amount <= 0) return 0;
-  return amount > FREE_SHIPPING_ABOVE ? 0 : SHIPPING_FEE;
+  const free = freeShippingAbove();
+  return free > 0 && amount > free ? 0 : shippingFee();
 }
 
 /**
@@ -50,5 +53,7 @@ export function withDiscount(subtotal: number, discount: number) {
 
 /** Combien il manque pour la livraison offerte (0 si déjà offerte) */
 export function missingForFreeShipping(amount: number) {
-  return amount > FREE_SHIPPING_ABOVE ? 0 : Math.max(0, FREE_SHIPPING_ABOVE - amount + 0.01);
+  const free = freeShippingAbove();
+  if (free <= 0) return Infinity;
+  return amount > free ? 0 : Math.max(0, free - amount + 0.01);
 }

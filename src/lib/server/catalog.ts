@@ -15,6 +15,13 @@ export async function getCatalog(): Promise<Catalog> {
   return read((d) => d.catalog);
 }
 
+/** Paramètres de la boutique (devise, WhatsApp, livraison) */
+export async function getSettings() {
+  "use cache";
+  cacheTag(CATALOG_TAG);
+  return read((d) => d.settings);
+}
+
 /** Sections de la page d'accueil (même étiquette de cache : rafraîchies avec l'admin) */
 export async function getHome() {
   "use cache";

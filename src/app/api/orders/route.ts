@@ -59,6 +59,7 @@ export async function POST(req: Request) {
       ...totals,
       payment: "cod",
       status: "nouvelle",
+      history: [{ status: "nouvelle", at: new Date().toISOString() }],
       source: body.source === "express" ? "express" : "checkout",
       createdAt: new Date().toISOString(),
     };

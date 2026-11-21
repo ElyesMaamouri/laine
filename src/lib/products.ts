@@ -1,4 +1,5 @@
 import type { GarmentId } from "./garments";
+import { storeSettings } from "./settings";
 
 export type Variant = {
   id: string;
@@ -109,6 +110,8 @@ export function findProduct(list: Product[], id: string) {
   return list.find((p) => p.id === id);
 }
 
+/** Prix dans la devise configurée (Paramètres de la boutique) */
 export function formatPrice(n: number) {
-  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(n);
+  const currency = storeSettings().currency;
+  return new Intl.NumberFormat("fr-FR", { style: "currency", currency, maximumFractionDigits: 2, minimumFractionDigits: Number.isInteger(n) ? 0 : 2 }).format(n);
 }
