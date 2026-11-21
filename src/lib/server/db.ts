@@ -14,7 +14,23 @@ import type { PromoCode } from "../promos";
 import { withDefaults, type HomeSection } from "../home";
 import { applySettings, defaultSettings, type StoreSettings } from "../settings";
 
-export type User = { id: string; name: string; email: string; passwordHash: string; createdAt: string };
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  createdAt: string;
+  /** coordonnées (fiche client, modifiables dans /admin/clients) */
+  phone?: string;
+  address?: string;
+  city?: string;
+  zip?: string;
+  /** note interne, visible seulement dans l'admin */
+  note?: string;
+};
+
+/** Client tel qu'envoyé à l'admin : jamais le mot de passe haché */
+export type AdminUser = Omit<User, "passwordHash">;
 
 export type OrderItem = {
   productId: string;

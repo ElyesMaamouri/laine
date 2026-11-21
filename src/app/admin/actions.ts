@@ -4,8 +4,8 @@
  * Chaque action vérifie la session admin, puis rafraîchit la boutique (updateTag) après modification.
  */
 import { updateTag } from "next/cache";
-import { read, write, ORDER_STATUSES, type Order, type OrderStatus, type Review } from "@/lib/server/db";
-import { adminConfigProblems, checkAdminCredentials, endAdminSession, isAdmin, startAdminSession } from "@/lib/server/auth";
+import { read, write, ORDER_STATUSES, type AdminUser, type Order, type OrderStatus, type Review } from "@/lib/server/db";
+import { adminConfigProblems, checkAdminCredentials, endAdminSession, hashPassword, isAdmin, startAdminSession } from "@/lib/server/auth";
 import { CATALOG_TAG } from "@/lib/server/catalog";
 import { garments, type GarmentId } from "@/lib/garments";
 import type { Product, Variant } from "@/lib/products";
@@ -81,9 +81,18 @@ export async function adminCheck() {
 
 /* ---------------- lecture ---------------- */
 
-export async function getAdminData(): Promise<{ catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[]; settings: StoreSettings; reviews: Review[] }> {
+export async function getAdminData(): Promise<{ catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[]; settings: StoreSettings; reviews: Review[]; users: AdminUser[] }> {
   await guard();
-  return read((d) => ({ catalog: d.catalog, orders: [...d.orders].reverse(), promos: d.promos, home: d.home, settings: d.settings, reviews: [...d.reviews].reverse() }));
+  return read((d) => ({
+    catalog: d.catalog,
+    orders: [...d.orders].reverse(),
+    promos: d.promos,
+    home: d.home,
+    settings: d.settings,
+    reviews: [...d.reviews].reverse(),
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars -- on retire le mot de passe haché
+    users: d.users.map(({ passwordHash, ...u }) => u).reverse(),
+  }));
 }
 
 /* ---------------- produits ---------------- */
@@ -435,4 +444,69 @@ export async function deleteReview(id: string): Promise<Result> {
     d.reviews = d.reviews.filter((r) => r.id !== id);
   });
   return { ok: true };
+}
+
+/* ---------------- clients ---------------- */
+
+export type CustomerInput = {
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  zip?: string;
+  note?: string;
+  /** obligatoire à la création, optionnel en modification (nouveau mot de passe) */
+  password?: string;
+};
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** Crée (id = null) ou modifie un compte client */
+export async function saveCustomer(input: CustomerInput, id: string | null): Promise<Result & { id?: string }> {
+  await guard();
+  const str = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+  const c = {
+    name: str(input.name, 80),
+    email: str(input.email, 120).toLowerCase(),
+    phone: str(input.phone, 24) || undefined,
+    address: str(input.address, 200) || undefined,
+    city: str(input.city, 80) || undefined,
+    zip: str(input.zip, 12) || undefined,
+    note: str(input.note, 1000) || undefined,
+  };
+  if (c.name.length < 2) return { ok: false, error: "Le nom est obligatoire." };
+  if (!EMAIL_RE.test(c.email)) return { ok: false, error: "Adresse e-mail invalide." };
+  if (c.phone && !/^[+\d][\d\s.-]{7,18}$/.test(c.phone)) return { ok: false, error: "Numéro de téléphone invalide." };
+  const password = String(input.password ?? "");
+  if (!id && password.length < 8) return { ok: false, error: "Mot de passe : 8 caractères minimum (à transmettre au client)." };
+  if (id && password && password.length < 8) return { ok: false, error: "Nouveau mot de passe : 8 caractères minimum." };
+  const passwordHash = password ? await hashPassword(password) : null;
+
+  const res = await write((d) => {
+    if (d.users.some((u) => u.email === c.email && u.id !== id)) return { error: "Un compte existe déjà avec cet e-mail." };
+    if (id) {
+      const u = d.users.find((x) => x.id === id);
+      if (!u) return { error: "Client introuvable." };
+      Object.assign(u, c, passwordHash ? { passwordHash } : {});
+      return { id };
+    }
+    const newId = crypto.randomUUID();
+    d.users.push({ id: newId, ...c, passwordHash: passwordHash!, createdAt: new Date().toISOString() });
+    return { id: newId };
+  });
+  if ("error" in res) return { ok: false, error: res.error! };
+  return { ok: true, id: res.id };
+}
+
+/** Supprime un compte client ; ses commandes sont conservées (redeviennent « sans compte ») */
+export async function deleteCustomer(id: string): Promise<Result> {
+  await guard();
+  const found = await write((d) => {
+    const n = d.users.length;
+    d.users = d.users.filter((u) => u.id !== id);
+    for (const o of d.orders) if (o.userId === id) o.userId = null;
+    return d.users.length < n;
+  });
+  return found ? { ok: true } : { ok: false, error: "Client introuvable." };
 }

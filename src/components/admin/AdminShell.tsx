@@ -5,12 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { adminCheck, adminLogout, getAdminData } from "@/app/admin/actions";
 import type { Catalog } from "@/lib/categories";
-import type { Order, Review } from "@/lib/server/db";
+import type { AdminUser, Order, Review } from "@/lib/server/db";
 import type { PromoCode } from "@/lib/promos";
 import type { HomeSection } from "@/lib/home";
 import { applySettings, type StoreSettings } from "@/lib/settings";
 
-type AdminData = { catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[]; settings: StoreSettings; reviews: Review[] };
+type AdminData = { catalog: Catalog; orders: Order[]; promos: PromoCode[]; home: HomeSection[]; settings: StoreSettings; reviews: Review[]; users: AdminUser[] };
 const Ctx = createContext<{ data: AdminData | null; reload: () => Promise<void> }>({ data: null, reload: async () => {} });
 export const useAdmin = () => useContext(Ctx);
 
@@ -19,6 +19,7 @@ const NAV = [
   ["/admin/produits", "Produits", "◫"],
   ["/admin/categories", "Catégories", "▤"],
   ["/admin/commandes", "Commandes", "☰"],
+  ["/admin/clients", "Clients", "☺"],
   ["/admin/promos", "Codes promo", "%"],
   ["/admin/accueil", "Page d'accueil", "⌂"],
   ["/admin/avis", "Avis clients", "★"],
